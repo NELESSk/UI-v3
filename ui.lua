@@ -98,6 +98,8 @@ local Theme = {
 }
 
 local Library = {
+    Version = "UI-v3-inline-3",
+    SupportsInlineColorPicker = true,
     Theme = Theme,
     Flags = {},
     Connections = {},
@@ -162,7 +164,11 @@ end
 function Library:UpdateMenuBindLabels()
     for _, window in ipairs(self.Windows) do
         if window.MenuHintLabel and window.MenuHintLabel.Parent then
-            window.MenuHintLabel.Text = tostring(window.Name or "Rat.lua UI @nelessk Discord")
+            window.MenuHintLabel.Text = string.format(
+                "%s  •  %s",
+                keyName(self.MenuKeybind),
+                string.upper(self.MenuBindMode or "Toggle")
+            )
         end
     end
 end
@@ -994,7 +1000,7 @@ function Library:Window(data)
     data = data or {}
 
     local window = setmetatable({
-        Name = data.Name or data.Title or "Rat.lua UI @nelessk Discord",
+        Name = data.Name or data.Title or "",
         Logo = data.Logo or "",
         FadeTime = data.FadeTime or 0.25,
         Size = data.Size or UDim2.fromOffset(752, 540),
@@ -1086,7 +1092,11 @@ function Library:Window(data)
         Size = UDim2.new(1, -16, 0, 16),
         BackgroundTransparency = 1,
         Font = Enum.Font.Code,
-        Text = tostring(window.Name or "Rat.lua UI @nelessk Discord"),
+        Text = string.format(
+            "%s  •  %s",
+            keyName(Library.MenuKeybind),
+            string.upper(Library.MenuBindMode)
+        ),
         TextColor3 = Theme.Text,
         TextSize = 12,
     })
@@ -1263,14 +1273,6 @@ function Library:Window(data)
     main.Visible = true
 
     return window
-end
-
-function WindowMethods:SetTitle(title)
-    self.Name = tostring(title or "")
-    if self.MenuHintLabel and self.MenuHintLabel.Parent then
-        self.MenuHintLabel.Text = self.Name
-    end
-    return self
 end
 
 function WindowMethods:SetOpen(state)
@@ -1814,7 +1816,14 @@ function SectionMethods:Toggle(data)
     })
     textStroke(label, 0.45)
 
-    local toggle = {Value = value, Flag = flag}
+    local toggle = {
+        Value = value,
+        Flag = flag,
+        Row = row,
+        Label = label,
+        Box = box,
+        Section = self
+    }
 
     function toggle:Set(newValue, silent)
         value = newValue == true
@@ -2840,7 +2849,14 @@ function SectionMethods:Colorpicker(data)
     })
     stroke(preview, Theme.Outline, 0, 1)
 
-    local object = {Value = value, Flag = flag}
+    local object = {
+        Value = value,
+        Flag = flag,
+        Row = row,
+        Preview = preview,
+        Label = label,
+        Section = self
+    }
 
     function object:Set(color, silent)
         if typeof(color) ~= "Color3" then
@@ -3452,7 +3468,7 @@ function Library:CreateWindow(data)
     data = data or {}
 
     local window = self:Window({
-        Name = data.Title or data.Name or "Rat.lua UI @nelessk Discord",
+        Name = data.Title or data.Name or "",
         Size = data.Size or UDim2.fromOffset(
             tonumber(data.Width) or 752,
             tonumber(data.Height) or 540
@@ -3544,6 +3560,51 @@ function SectionMethods:AddToggle(id, data)
             table.insert(changed, callback)
         end
         return selfObject
+    end
+
+    object.AddColorPicker = function(selfObject, colorId, colorData)
+        colorData = colorData or {}
+
+        local picker = selfObject.Section:Colorpicker({
+            Name = "",
+            Flag = tostring(colorId),
+            Default = colorData.Default or Color3.fromRGB(255, 255, 255),
+            Callback = colorData.Callback or function() end,
+        })
+
+        decorateLinoriaObject(picker)
+        registerLinoriaControl(Library.Options, colorId, picker)
+
+        local pickerRow = picker.Row
+        local preview = picker.Preview
+        local pickerLabel = picker.Label
+
+        if pickerRow and selfObject.Row then
+            pickerRow.Parent = selfObject.Row
+            pickerRow.AnchorPoint = Vector2.new(1, 0.5)
+            pickerRow.Position = UDim2.new(1, -1, 0.5, 0)
+            pickerRow.Size = UDim2.fromOffset(24, 14)
+            pickerRow.BackgroundTransparency = 1
+            pickerRow.ZIndex = 50
+
+            if pickerLabel then
+                pickerLabel.Visible = false
+                pickerLabel.Text = ""
+            end
+
+            if preview then
+                preview.AnchorPoint = Vector2.new(0.5, 0.5)
+                preview.Position = UDim2.fromScale(0.5, 0.5)
+                preview.Size = UDim2.fromOffset(22, 12)
+                preview.ZIndex = 51
+            end
+
+            if selfObject.Label then
+                selfObject.Label.Size = UDim2.new(1, -52, 1, 0)
+            end
+        end
+
+        return picker
     end
 
     return registerLinoriaControl(Library.Toggles, id, object)
