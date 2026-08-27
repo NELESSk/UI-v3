@@ -98,8 +98,6 @@ local Theme = {
 }
 
 local Library = {
-    Version = "UI-v3-inline-3",
-    SupportsInlineColorPicker = true,
     Theme = Theme,
     Flags = {},
     Connections = {},
@@ -1816,14 +1814,7 @@ function SectionMethods:Toggle(data)
     })
     textStroke(label, 0.45)
 
-    local toggle = {
-        Value = value,
-        Flag = flag,
-        Row = row,
-        Label = label,
-        Box = box,
-        Section = self
-    }
+    local toggle = {Value = value, Flag = flag}
 
     function toggle:Set(newValue, silent)
         value = newValue == true
@@ -2849,14 +2840,7 @@ function SectionMethods:Colorpicker(data)
     })
     stroke(preview, Theme.Outline, 0, 1)
 
-    local object = {
-        Value = value,
-        Flag = flag,
-        Row = row,
-        Preview = preview,
-        Label = label,
-        Section = self
-    }
+    local object = {Value = value, Flag = flag}
 
     function object:Set(color, silent)
         if typeof(color) ~= "Color3" then
@@ -2901,14 +2885,76 @@ function SectionMethods:Colorpicker(data)
 
         local popupWidth = 186
         local popupHeight = 174
-        local viewport = getViewportSize()
-        local wantedX = preview.AbsolutePosition.X + preview.AbsoluteSize.X - popupWidth
-        local wantedY = preview.AbsolutePosition.Y + preview.AbsoluteSize.Y + 4
-        local popupX = clamp(wantedX, WINDOW_MARGIN, math.max(WINDOW_MARGIN, viewport.X - popupWidth - WINDOW_MARGIN))
-        local popupY = clamp(wantedY, WINDOW_MARGIN, math.max(WINDOW_MARGIN, viewport.Y - popupHeight - WINDOW_MARGIN))
+
+        local popupParent =
+            self.Window
+            and self.Window.Surface
+            or ScreenGui
+
+        local parentAbs =
+            popupParent.AbsolutePosition
+
+        local parentSize =
+            popupParent.AbsoluteSize
+
+        local wantedAbsX =
+            preview.AbsolutePosition.X
+            + preview.AbsoluteSize.X
+            - popupWidth
+
+        local wantedAbsY =
+            preview.AbsolutePosition.Y
+            + preview.AbsoluteSize.Y
+            + 4
+
+        local minAbsX =
+            parentAbs.X + 8
+
+        local minAbsY =
+            parentAbs.Y + 8
+
+        local maxAbsX =
+            parentAbs.X
+            + parentSize.X
+            - popupWidth
+            - 8
+
+        local maxAbsY =
+            parentAbs.Y
+            + parentSize.Y
+            - popupHeight
+            - 8
+
+        local popupAbsX =
+            clamp(
+                wantedAbsX,
+                minAbsX,
+                math.max(
+                    minAbsX,
+                    maxAbsX
+                )
+            )
+
+        local popupAbsY =
+            clamp(
+                wantedAbsY,
+                minAbsY,
+                math.max(
+                    minAbsY,
+                    maxAbsY
+                )
+            )
+
+        local popupX =
+            popupAbsX
+            - parentAbs.X
+
+        local popupY =
+            popupAbsY
+            - parentAbs.Y
 
         popup = create("Frame", {
-            Parent = ScreenGui,
+            Parent = popupParent,
             Name = "ColorPickerPopup",
             Position = UDim2.fromOffset(popupX, popupY),
             Size = UDim2.fromOffset(popupWidth, popupHeight),
@@ -2940,6 +2986,26 @@ function SectionMethods:Colorpicker(data)
                 return pickerMouseInside or pointInsideGui(popup, point)
             end
         )
+
+        if self.Window and self.Window.Main then
+            popupConnect(
+                self.Window.Main:GetPropertyChangedSignal("Visible"),
+                function()
+                    if not self.Window.Main.Visible then
+                        destroyPopup()
+                    end
+                end
+            )
+
+            popupConnect(
+                self.Window.Main.AncestryChanged,
+                function(_, parent)
+                    if not parent then
+                        destroyPopup()
+                    end
+                end
+            )
+        end
 
         local pickerDrag = create("TextButton", {
             Parent = popup,
@@ -3560,51 +3626,6 @@ function SectionMethods:AddToggle(id, data)
             table.insert(changed, callback)
         end
         return selfObject
-    end
-
-    object.AddColorPicker = function(selfObject, colorId, colorData)
-        colorData = colorData or {}
-
-        local picker = selfObject.Section:Colorpicker({
-            Name = "",
-            Flag = tostring(colorId),
-            Default = colorData.Default or Color3.fromRGB(255, 255, 255),
-            Callback = colorData.Callback or function() end,
-        })
-
-        decorateLinoriaObject(picker)
-        registerLinoriaControl(Library.Options, colorId, picker)
-
-        local pickerRow = picker.Row
-        local preview = picker.Preview
-        local pickerLabel = picker.Label
-
-        if pickerRow and selfObject.Row then
-            pickerRow.Parent = selfObject.Row
-            pickerRow.AnchorPoint = Vector2.new(1, 0.5)
-            pickerRow.Position = UDim2.new(1, -1, 0.5, 0)
-            pickerRow.Size = UDim2.fromOffset(24, 14)
-            pickerRow.BackgroundTransparency = 1
-            pickerRow.ZIndex = 50
-
-            if pickerLabel then
-                pickerLabel.Visible = false
-                pickerLabel.Text = ""
-            end
-
-            if preview then
-                preview.AnchorPoint = Vector2.new(0.5, 0.5)
-                preview.Position = UDim2.fromScale(0.5, 0.5)
-                preview.Size = UDim2.fromOffset(22, 12)
-                preview.ZIndex = 51
-            end
-
-            if selfObject.Label then
-                selfObject.Label.Size = UDim2.new(1, -52, 1, 0)
-            end
-        end
-
-        return picker
     end
 
     return registerLinoriaControl(Library.Toggles, id, object)
