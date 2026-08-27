@@ -162,11 +162,7 @@ end
 function Library:UpdateMenuBindLabels()
     for _, window in ipairs(self.Windows) do
         if window.MenuHintLabel and window.MenuHintLabel.Parent then
-            window.MenuHintLabel.Text = string.format(
-                "%s  •  %s",
-                keyName(self.MenuKeybind),
-                string.upper(self.MenuBindMode or "Toggle")
-            )
+            window.MenuHintLabel.Text = tostring(window.Name or "Rat.lua UI @nelessk Discord")
         end
     end
 end
@@ -998,7 +994,7 @@ function Library:Window(data)
     data = data or {}
 
     local window = setmetatable({
-        Name = data.Name or data.Title or "",
+        Name = data.Name or data.Title or "Rat.lua UI @nelessk Discord",
         Logo = data.Logo or "",
         FadeTime = data.FadeTime or 0.25,
         Size = data.Size or UDim2.fromOffset(752, 540),
@@ -1090,11 +1086,7 @@ function Library:Window(data)
         Size = UDim2.new(1, -16, 0, 16),
         BackgroundTransparency = 1,
         Font = Enum.Font.Code,
-        Text = string.format(
-            "%s  •  %s",
-            keyName(Library.MenuKeybind),
-            string.upper(Library.MenuBindMode)
-        ),
+        Text = tostring(window.Name or "Rat.lua UI @nelessk Discord"),
         TextColor3 = Theme.Text,
         TextSize = 12,
     })
@@ -1271,6 +1263,14 @@ function Library:Window(data)
     main.Visible = true
 
     return window
+end
+
+function WindowMethods:SetTitle(title)
+    self.Name = tostring(title or "")
+    if self.MenuHintLabel and self.MenuHintLabel.Parent then
+        self.MenuHintLabel.Text = self.Name
+    end
+    return self
 end
 
 function WindowMethods:SetOpen(state)
@@ -3452,7 +3452,7 @@ function Library:CreateWindow(data)
     data = data or {}
 
     local window = self:Window({
-        Name = data.Title or data.Name or "",
+        Name = data.Title or data.Name or "Rat.lua UI @nelessk Discord",
         Size = data.Size or UDim2.fromOffset(
             tonumber(data.Width) or 752,
             tonumber(data.Height) or 540
