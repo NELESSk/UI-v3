@@ -98,7 +98,7 @@ local Theme = {
 }
 
 local Library = {
-    Version = "UI-v3-inline-5-clean-motion",
+    Version = "UI-v3-inline-6-thinline-fade",
     SupportsInlineColorPicker = true,
     Theme = Theme,
     Flags = {},
@@ -1070,6 +1070,7 @@ function Library:Window(data)
 
     local outerStroke = stroke(main, Theme.Outline, 0, 1)
     outerStroke.LineJoinMode = Enum.LineJoinMode.Round
+    window.OuterStroke = outerStroke
 
     local side = create("Frame", {
         Parent = main,
@@ -1361,7 +1362,7 @@ function Library:Window(data)
             Theme.Accent
 
         cursor.BackgroundTransparency =
-            0.02
+            1
 
         cursor.BorderSizePixel = 0
         cursor.ZIndex = 9999999
@@ -1388,7 +1389,7 @@ function Library:Window(data)
             Theme.Accent
 
         cursorGlow.Thickness = 1
-        cursorGlow.Transparency = 0.30
+        cursorGlow.Transparency = 1
         cursorGlow.LineJoinMode =
             Enum.LineJoinMode.Round
 
@@ -1430,6 +1431,34 @@ function Library:Window(data)
         end
 
         task.spawn(function()
+            -- First materialize softly from transparency.
+            local fadeCursor =
+                tween(
+                    cursor,
+                    {
+                        BackgroundTransparency = 0.04
+                    },
+                    0.30,
+                    Enum.EasingStyle.Sine,
+                    Enum.EasingDirection.Out
+                )
+
+            tween(
+                cursorGlow,
+                {
+                    Transparency = 0.30
+                },
+                0.30,
+                Enum.EasingStyle.Sine,
+                Enum.EasingDirection.Out
+            )
+
+            fadeCursor.Completed:Wait()
+
+            if not stillValid() then
+                return
+            end
+
             -- UP
             if not playStep(
                 UDim2.fromOffset(
@@ -1528,6 +1557,14 @@ function Library:Window(data)
             end
 
             -- Prepare bottom-to-top reveal.
+            surface.BorderSizePixel = 0
+
+            if self.OuterStroke
+                and self.OuterStroke.Parent then
+
+                self.OuterStroke.Transparency = 1
+            end
+
             root.Visible = true
             root.Position =
                 UDim2.fromOffset(
@@ -1667,6 +1704,14 @@ function Library:Window(data)
                     fullSize.Y
                 )
 
+            surface.BorderSizePixel = 2
+
+            if self.OuterStroke
+                and self.OuterStroke.Parent then
+
+                self.OuterStroke.Transparency = 0
+            end
+
             if edge
                 and edge.Parent then
 
@@ -1741,6 +1786,9 @@ function WindowMethods:SetOpen(state)
                 )
 
             if startupSurface then
+                startupSurface.Visible = true
+                startupSurface.BorderSizePixel = 2
+
                 startupSurface.Position =
                     UDim2.fromOffset(
                         0,
@@ -1752,6 +1800,12 @@ function WindowMethods:SetOpen(state)
                         startupSize.X,
                         startupSize.Y
                     )
+            end
+
+            if self.OuterStroke
+                and self.OuterStroke.Parent then
+
+                self.OuterStroke.Transparency = 0
             end
         end
     end
@@ -1781,9 +1835,13 @@ function WindowMethods:SetOpen(state)
     local edge =
         self.WipeEdge
 
+    local outerStroke =
+        self.OuterStroke
+
     if not root
         or not root.Parent
         or not surface then
+
         return
     end
 
@@ -1807,33 +1865,15 @@ function WindowMethods:SetOpen(state)
     local openY =
         rest.Y
 
-    surface.Size =
-        UDim2.fromOffset(
-            fullSize.X,
-            fullSize.Y
-        )
+    local function showOnlyThinLine()
+        surface.Visible = false
+        surface.BorderSizePixel = 0
 
-    if state then
-        -- Open from a clean 1px TOP line.
-        root.Visible = true
+        if outerStroke
+            and outerStroke.Parent then
 
-        root.Position =
-            UDim2.fromOffset(
-                openX,
-                openY
-            )
-
-        root.Size =
-            UDim2.fromOffset(
-                fullSize.X,
-                1
-            )
-
-        surface.Position =
-            UDim2.fromOffset(
-                0,
-                0
-            )
+            outerStroke.Transparency = 1
+        end
 
         if edge then
             edge.Visible = true
@@ -1852,7 +1892,65 @@ function WindowMethods:SetOpen(state)
                 )
 
             edge.BackgroundTransparency =
-                0.04
+                0.02
+        end
+    end
+
+    local function restoreSurface()
+        surface.Visible = true
+        surface.BorderSizePixel = 2
+
+        if outerStroke
+            and outerStroke.Parent then
+
+            outerStroke.Transparency = 0
+        end
+
+        if edge
+            and edge.Parent then
+
+            edge.Visible = false
+            edge.BackgroundTransparency =
+                0.18
+        end
+    end
+
+    if state then
+        -- Start from a REAL 1px line only.
+        root.Visible = true
+
+        root.Position =
+            UDim2.fromOffset(
+                openX,
+                openY
+            )
+
+        root.Size =
+            UDim2.fromOffset(
+                fullSize.X,
+                1
+            )
+
+        surface.Size =
+            UDim2.fromOffset(
+                fullSize.X,
+                fullSize.Y
+            )
+
+        surface.Position =
+            UDim2.fromOffset(
+                0,
+                0
+            )
+
+        showOnlyThinLine()
+
+        -- Let the 1px line exist for a brief clean beat.
+        task.wait(0.035)
+
+        if self.AnimationToken ~= token
+            or not self.IsOpen then
+            return
         end
 
         local openTween =
@@ -1865,10 +1963,23 @@ function WindowMethods:SetOpen(state)
                             fullSize.Y
                         )
                 },
-                0.34,
+                0.30,
                 Enum.EasingStyle.Quint,
                 Enum.EasingDirection.Out
             )
+
+        -- Reveal actual surface only after the fold has started,
+        -- so the border can never make the line look thick.
+        task.delay(0.055, function()
+            if self.AnimationToken == token
+                and self.IsOpen
+                and surface
+                and surface.Parent then
+
+                surface.Visible = true
+                surface.BorderSizePixel = 0
+            end
+        end)
 
         openTween.Completed:Wait()
 
@@ -1895,16 +2006,9 @@ function WindowMethods:SetOpen(state)
                 0
             )
 
-        if edge
-            and edge.Parent then
-
-            edge.Visible = false
-            edge.BackgroundTransparency =
-                0.18
-        end
+        restoreSurface()
 
     else
-        -- Collapse upward into the same 1px TOP line.
         root.Visible = true
 
         root.Position =
@@ -1925,6 +2029,16 @@ function WindowMethods:SetOpen(state)
                 0
             )
 
+        -- Hide border/stroke immediately so they cannot create
+        -- the thick band while the window is collapsing.
+        surface.BorderSizePixel = 0
+
+        if outerStroke
+            and outerStroke.Parent then
+
+            outerStroke.Transparency = 1
+        end
+
         if edge then
             edge.Visible = true
             edge.Position =
@@ -1942,7 +2056,7 @@ function WindowMethods:SetOpen(state)
                 )
 
             edge.BackgroundTransparency =
-                0.04
+                0.02
         end
 
         local closeTween =
@@ -1955,10 +2069,21 @@ function WindowMethods:SetOpen(state)
                             1
                         )
                 },
-                0.28,
+                0.26,
                 Enum.EasingStyle.Quint,
                 Enum.EasingDirection.InOut
             )
+
+        -- Near the end, hide the actual surface completely.
+        task.delay(0.20, function()
+            if self.AnimationToken == token
+                and not self.IsOpen
+                and surface
+                and surface.Parent then
+
+                surface.Visible = false
+            end
+        end)
 
         closeTween.Completed:Wait()
 
@@ -1967,8 +2092,14 @@ function WindowMethods:SetOpen(state)
             return
         end
 
-        -- Briefly leave only the 1px top line visible.
-        task.wait(0.035)
+        -- At this point ONLY the 1px edge is visible.
+        root.Size =
+            UDim2.fromOffset(
+                fullSize.X,
+                1
+            )
+
+        task.wait(0.055)
 
         if self.AnimationToken ~= token
             or self.IsOpen then
@@ -1989,6 +2120,9 @@ function WindowMethods:SetOpen(state)
                 fullSize.Y
             )
 
+        surface.Visible = true
+        surface.BorderSizePixel = 2
+
         surface.Position =
             UDim2.fromOffset(
                 0,
@@ -2000,6 +2134,12 @@ function WindowMethods:SetOpen(state)
                 fullSize.X,
                 fullSize.Y
             )
+
+        if outerStroke
+            and outerStroke.Parent then
+
+            outerStroke.Transparency = 0
+        end
 
         if edge
             and edge.Parent then
