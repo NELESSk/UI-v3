@@ -98,7 +98,7 @@ local Theme = {
 }
 
 local Library = {
-    Version = "UI-v3-inline-10-pure-fade-unload",
+    Version = "UI-v3-inline-11-no-lines-unload",
     SupportsInlineColorPicker = true,
     Theme = Theme,
     Flags = {},
@@ -1100,38 +1100,11 @@ function Library:Window(data)
     window.RestPosition = Vector2.new(initialX, initialY)
     window.AnimationToken = 0
 
-    local wipeEdge = create("Frame", {
-        Parent = windowRoot,
-        Name = "WipeEdge",
-        AnchorPoint = Vector2.new(0, 0),
-        Position = UDim2.fromOffset(0, 0),
-        Size = UDim2.new(1, 0, 0, 1),
-        BackgroundColor3 = Theme.Accent,
-        BackgroundTransparency = 1,
-        BorderSizePixel = 0,
-        Visible = false,
-        ZIndex = 9000,
-    })
-    table.insert(window.AccentObjects, wipeEdge)
-    window.WipeEdge = wipeEdge
+    window.WipeEdge = nil
 
-    -- Independent animation edge.
-    -- It is NEVER resized vertically: always exactly 1 physical pixel.
-    local animationLine = create("Frame", {
-        Parent = ScreenGui,
-        Name = "WindowAnimationLine",
-        AnchorPoint = Vector2.new(0, 0),
-        Position = UDim2.fromOffset(initialX, initialY),
-        Size = UDim2.fromOffset(initialWidth, 1),
-        BackgroundColor3 = Theme.Accent,
-        BackgroundTransparency = 0.02,
-        BorderSizePixel = 0,
-        Visible = false,
-        ZIndex = 9999998,
-    })
 
-    window.AnimationLine = animationLine
-    table.insert(window.AccentObjects, animationLine)
+    window.AnimationLine = nil
+
 
     local outerStroke = stroke(main, Theme.Outline, 0, 1)
     outerStroke.LineJoinMode = Enum.LineJoinMode.Round
@@ -1377,9 +1350,6 @@ function Library:Window(data)
         local fade =
             self.FadeGroup
 
-        local line =
-            self.AnimationLine
-
         local outerStroke =
             self.OuterStroke
 
@@ -1403,13 +1373,6 @@ function Library:Window(data)
                 root.Position.X.Offset,
                 root.Position.Y.Offset
             )
-
-        -- Startup has NO wipe line.
-        if line
-            and line.Parent then
-
-            line.Visible = false
-        end
 
         root.Visible = true
 
@@ -1455,7 +1418,6 @@ function Library:Window(data)
                     fullSize.Y
                 )
 
-            -- Completely transparent first frame.
             fade.GroupTransparency = 1
 
             task.wait()
@@ -1487,24 +1449,26 @@ function Library:Window(data)
         local root =
             self.Main
 
+        local surface =
+            self.Surface
+
         local fade =
             self.FadeGroup
 
-        local line =
-            self.AnimationLine
-
         if not root
-            or not root.Parent then
+            or not root.Parent
+            or not surface then
 
             self.UnloadAnimating = false
             return
         end
 
-        if line
-            and line.Parent then
-
-            line.Visible = false
-        end
+        local fullSize =
+            self.OpenPixelSize
+            or Vector2.new(
+                root.AbsoluteSize.X,
+                root.AbsoluteSize.Y
+            )
 
         local rest =
             self.RestPosition
@@ -1515,49 +1479,92 @@ function Library:Window(data)
 
         root.Visible = true
 
+        root.Position =
+            UDim2.fromOffset(
+                rest.X,
+                rest.Y
+            )
+
+        root.Size =
+            UDim2.fromOffset(
+                fullSize.X,
+                fullSize.Y
+            )
+
+        surface.Position =
+            UDim2.fromOffset(
+                0,
+                0
+            )
+
         if fade
             and fade.Parent then
 
             fade.GroupTransparency = 0
         end
 
-        -- Smooth shutdown: fade away and drift slightly downward.
-        local fadeTween
+        -- Dedicated Unload Script animation:
+        -- fade out while the whole window gently contracts toward its center.
+        local shrinkX =
+            math.floor(
+                fullSize.X * 0.035
+                + 0.5
+            )
+
+        local shrinkY =
+            math.floor(
+                fullSize.Y * 0.035
+                + 0.5
+            )
+
+        local targetWidth =
+            math.max(
+                1,
+                fullSize.X - shrinkX * 2
+            )
+
+        local targetHeight =
+            math.max(
+                1,
+                fullSize.Y - shrinkY * 2
+            )
+
+        local rootTween =
+            tween(
+                root,
+                {
+                    Position =
+                        UDim2.fromOffset(
+                            rest.X + shrinkX,
+                            rest.Y + shrinkY
+                        ),
+
+                    Size =
+                        UDim2.fromOffset(
+                            targetWidth,
+                            targetHeight
+                        )
+                },
+                0.42,
+                Enum.EasingStyle.Quint,
+                Enum.EasingDirection.In
+            )
 
         if fade
             and fade.Parent then
 
-            fadeTween =
-                tween(
-                    fade,
-                    {
-                        GroupTransparency = 1
-                    },
-                    0.38,
-                    Enum.EasingStyle.Sine,
-                    Enum.EasingDirection.In
-                )
+            tween(
+                fade,
+                {
+                    GroupTransparency = 1
+                },
+                0.42,
+                Enum.EasingStyle.Sine,
+                Enum.EasingDirection.In
+            )
         end
 
-        tween(
-            root,
-            {
-                Position =
-                    UDim2.fromOffset(
-                        rest.X,
-                        rest.Y + 12
-                    )
-            },
-            0.38,
-            Enum.EasingStyle.Quint,
-            Enum.EasingDirection.In
-        )
-
-        if fadeTween then
-            fadeTween.Completed:Wait()
-        else
-            task.wait(0.38)
-        end
+        rootTween.Completed:Wait()
 
         self.UnloadAnimating = false
     end
@@ -1583,110 +1590,114 @@ function WindowMethods:SetOpen(state)
 
     self.IsOpen = state
     self.AnimationToken = (self.AnimationToken or 0) + 1
-    local token = self.AnimationToken
+
+    local token =
+        self.AnimationToken
 
     if not state then
         Library:CloseOpenFrames()
     end
 
-    local root = self.Main
-    local surface = self.Surface
-    local edge = self.WipeEdge
-    local line = self.AnimationLine
-    local fade = self.FadeGroup
-    local outerStroke = self.OuterStroke
+    local root =
+        self.Main
 
-    if not root or not root.Parent or not surface then
+    local surface =
+        self.Surface
+
+    local fade =
+        self.FadeGroup
+
+    if not root
+        or not root.Parent
+        or not surface then
+
         return
     end
 
-    local fullSize = self.OpenPixelSize or Vector2.new(
-        surface.AbsoluteSize.X,
-        surface.AbsoluteSize.Y
-    )
+    local fullSize =
+        self.OpenPixelSize
+        or Vector2.new(
+            surface.AbsoluteSize.X,
+            surface.AbsoluteSize.Y
+        )
 
-    local rest = self.RestPosition or Vector2.new(
-        root.Position.X.Offset,
-        root.Position.Y.Offset
-    )
+    local rest =
+        self.RestPosition
+        or Vector2.new(
+            root.Position.X.Offset,
+            root.Position.Y.Offset
+        )
 
-    local openX = rest.X
-    local openY = rest.Y
+    local openX =
+        rest.X
 
-    surface.Size = UDim2.fromOffset(fullSize.X, fullSize.Y)
+    local openY =
+        rest.Y
 
-    -- The old child wipe is hidden. The separate ScreenGui line below
-    -- follows exactly the same boundary and can never become > 1px.
-    if edge then
-        edge.Visible = false
-        edge.Size = UDim2.new(1, 0, 0, 1)
-    end
+    surface.Size =
+        UDim2.fromOffset(
+            fullSize.X,
+            fullSize.Y
+        )
 
-    local function beginThinLine(y)
-        if line and line.Parent then
-            line.Visible = true
-            line.Position = UDim2.fromOffset(openX, y)
-            line.Size = UDim2.fromOffset(fullSize.X, 1)
-            line.BackgroundTransparency = 0.02
-        end
+    if fade
+        and fade.Parent then
 
-        -- Remove only the extra visual thickness during the wipe.
-        surface.BorderSizePixel = 0
+        fade.Size =
+            UDim2.fromOffset(
+                fullSize.X,
+                fullSize.Y
+            )
 
-        if outerStroke and outerStroke.Parent then
-            outerStroke.Transparency = 1
-        end
-    end
-
-    local function finishThinLine()
-        if line and line.Parent then
-            line.Visible = false
-            line.Size = UDim2.fromOffset(fullSize.X, 1)
-        end
-
-        if surface and surface.Parent then
-            surface.BorderSizePixel = 2
-        end
-
-        if outerStroke and outerStroke.Parent then
-            outerStroke.Transparency = 0
-        end
+        fade.GroupTransparency = 0
     end
 
     if state then
-        -- ORIGINAL OPEN:
-        -- root starts at the bottom with zero height,
-        -- then moves back to its resting position while expanding.
+        -- Original menu opening motion, with no wipe line.
         root.Visible = true
-        root.Position = UDim2.fromOffset(openX, openY + fullSize.Y)
-        root.Size = UDim2.fromOffset(fullSize.X, 0)
-        surface.Position = UDim2.fromOffset(0, -fullSize.Y)
 
-        if fade
-            and fade.Parent then
+        root.Position =
+            UDim2.fromOffset(
+                openX,
+                openY + fullSize.Y
+            )
 
-            fade.Size =
-                UDim2.fromOffset(
-                    fullSize.X,
-                    fullSize.Y
-                )
+        root.Size =
+            UDim2.fromOffset(
+                fullSize.X,
+                0
+            )
 
-            fade.GroupTransparency = 1
-        end
+        surface.Position =
+            UDim2.fromOffset(
+                0,
+                -fullSize.Y
+            )
 
-        beginThinLine(openY + fullSize.Y)
-
-        local rootPosTween = tween(
-            root,
-            {Position = UDim2.fromOffset(openX, openY)},
-            0.40,
-            Enum.EasingStyle.Quint,
-            Enum.EasingDirection.Out
-        )
+        local rootPosTween =
+            tween(
+                root,
+                {
+                    Position =
+                        UDim2.fromOffset(
+                            openX,
+                            openY
+                        )
+                },
+                0.40,
+                Enum.EasingStyle.Quint,
+                Enum.EasingDirection.Out
+            )
 
         tween(
             root,
-            {Size = UDim2.fromOffset(fullSize.X, fullSize.Y)},
+            {
+                Size =
+                    UDim2.fromOffset(
+                        fullSize.X,
+                        fullSize.Y
+                    )
+            },
             0.40,
             Enum.EasingStyle.Quint,
             Enum.EasingDirection.Out
@@ -1694,187 +1705,167 @@ function WindowMethods:SetOpen(state)
 
         tween(
             surface,
-            {Position = UDim2.fromOffset(0, 0)},
+            {
+                Position =
+                    UDim2.fromOffset(
+                        0,
+                        0
+                    )
+            },
             0.40,
             Enum.EasingStyle.Quint,
             Enum.EasingDirection.Out
         )
 
-        if fade
-            and fade.Parent then
-
-            tween(
-                fade,
-                {
-                    GroupTransparency = 0
-                },
-                0.44,
-                Enum.EasingStyle.Sine,
-                Enum.EasingDirection.Out
-            )
-        end
-
-        if line and line.Parent then
-            tween(
-                line,
-                {Position = UDim2.fromOffset(openX, openY)},
-                0.40,
-                Enum.EasingStyle.Quint,
-                Enum.EasingDirection.Out
-            )
-        end
-
         task.spawn(function()
             rootPosTween.Completed:Wait()
 
-            if self.AnimationToken ~= token or not self.IsOpen then
+            if self.AnimationToken ~= token
+                or not self.IsOpen then
+
                 return
             end
 
-            if root and root.Parent then
-                local finalRest = self.RestPosition or Vector2.new(openX, openY)
-                root.Position = UDim2.fromOffset(finalRest.X, finalRest.Y)
-                root.Size = UDim2.fromOffset(fullSize.X, fullSize.Y)
+            if root
+                and root.Parent then
+
+                local finalRest =
+                    self.RestPosition
+                    or Vector2.new(
+                        openX,
+                        openY
+                    )
+
+                root.Position =
+                    UDim2.fromOffset(
+                        finalRest.X,
+                        finalRest.Y
+                    )
+
+                root.Size =
+                    UDim2.fromOffset(
+                        fullSize.X,
+                        fullSize.Y
+                    )
             end
 
-            if surface and surface.Parent then
-                surface.Position = UDim2.fromOffset(0, 0)
+            if surface
+                and surface.Parent then
+
+                surface.Position =
+                    UDim2.fromOffset(
+                        0,
+                        0
+                    )
             end
-
-            if fade
-                and fade.Parent then
-
-                fade.GroupTransparency = 0
-            end
-
-            finishThinLine()
         end)
 
     else
-        -- ORIGINAL CLOSE:
-        -- exact old top -> bottom wipe.
+        -- Original menu closing motion, with no wipe line.
         root.Visible = true
-        root.Position = UDim2.fromOffset(openX, openY)
-        root.Size = UDim2.fromOffset(fullSize.X, fullSize.Y)
-        surface.Position = UDim2.fromOffset(0, 0)
 
-        beginThinLine(openY)
-
-        if fade
-            and fade.Parent then
-
-            fade.Size =
-                UDim2.fromOffset(
-                    fullSize.X,
-                    fullSize.Y
-                )
-
-            fade.GroupTransparency = 0
-
-            tween(
-                fade,
-                {
-                    GroupTransparency = 0.88
-                },
-                0.30,
-                Enum.EasingStyle.Sine,
-                Enum.EasingDirection.In
+        root.Position =
+            UDim2.fromOffset(
+                openX,
+                openY
             )
-        end
 
-        local closeTween = tween(
-            root,
+        root.Size =
+            UDim2.fromOffset(
+                fullSize.X,
+                fullSize.Y
+            )
+
+        surface.Position =
+            UDim2.fromOffset(
+                0,
+                0
+            )
+
+        local closeTween =
+            tween(
+                root,
+                {
+                    Position =
+                        UDim2.fromOffset(
+                            openX,
+                            openY + fullSize.Y
+                        ),
+
+                    Size =
+                        UDim2.fromOffset(
+                            fullSize.X,
+                            0
+                        )
+                },
+                0.36,
+                Enum.EasingStyle.Quint,
+                Enum.EasingDirection.InOut
+            )
+
+        tween(
+            surface,
             {
-                Position = UDim2.fromOffset(openX, openY + fullSize.Y),
-                Size = UDim2.fromOffset(fullSize.X, 0),
+                Position =
+                    UDim2.fromOffset(
+                        0,
+                        -fullSize.Y
+                    )
             },
             0.36,
             Enum.EasingStyle.Quint,
             Enum.EasingDirection.InOut
         )
 
-        tween(
-            surface,
-            {Position = UDim2.fromOffset(0, -fullSize.Y)},
-            0.36,
-            Enum.EasingStyle.Quint,
-            Enum.EasingDirection.InOut
-        )
-
-        if line and line.Parent then
-            tween(
-                line,
-                {Position = UDim2.fromOffset(openX, openY + fullSize.Y)},
-                0.36,
-                Enum.EasingStyle.Quint,
-                Enum.EasingDirection.InOut
-            )
-        end
-
         task.spawn(function()
             closeTween.Completed:Wait()
 
-            if self.AnimationToken ~= token or self.IsOpen then
+            if self.AnimationToken ~= token
+                or self.IsOpen then
+
                 return
             end
 
-            if root and root.Parent then
+            if root
+                and root.Parent then
+
                 root.Visible = false
 
-                local finalRest = self.RestPosition or Vector2.new(openX, openY)
-                root.Position = UDim2.fromOffset(finalRest.X, finalRest.Y)
-                root.Size = UDim2.fromOffset(fullSize.X, fullSize.Y)
-            end
-
-            if surface and surface.Parent then
-                surface.Position = UDim2.fromOffset(0, 0)
-                surface.Size = UDim2.fromOffset(fullSize.X, fullSize.Y)
-            end
-
-            -- Final close flourish:
-            -- keep the exact 1px line and erase it RIGHT -> LEFT.
-            if line
-                and line.Parent then
-
-                line.Visible = true
-                line.AnchorPoint = Vector2.new(0, 0)
-                line.Position =
-                    UDim2.fromOffset(
+                local finalRest =
+                    self.RestPosition
+                    or Vector2.new(
                         openX,
-                        openY + fullSize.Y
+                        openY
                     )
 
-                line.Size =
+                root.Position =
+                    UDim2.fromOffset(
+                        finalRest.X,
+                        finalRest.Y
+                    )
+
+                root.Size =
                     UDim2.fromOffset(
                         fullSize.X,
-                        1
+                        fullSize.Y
                     )
-
-                local lineCloseTween =
-                    tween(
-                        line,
-                        {
-                            Size =
-                                UDim2.fromOffset(
-                                    0,
-                                    1
-                                )
-                        },
-                        0.18,
-                        Enum.EasingStyle.Quint,
-                        Enum.EasingDirection.In
-                    )
-
-                lineCloseTween.Completed:Wait()
             end
 
-            if fade
-                and fade.Parent then
+            if surface
+                and surface.Parent then
 
-                fade.GroupTransparency = 0
+                surface.Position =
+                    UDim2.fromOffset(
+                        0,
+                        0
+                    )
+
+                surface.Size =
+                    UDim2.fromOffset(
+                        fullSize.X,
+                        fullSize.Y
+                    )
             end
-
-            finishThinLine()
         end)
     end
 end
