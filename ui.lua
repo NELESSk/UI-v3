@@ -98,7 +98,7 @@ local Theme = {
 }
 
 local Library = {
-    Version = "UI-v3-inline-11-no-lines-unload",
+    Version = "UI-v3-inline-12-collapse-no-line",
     SupportsInlineColorPicker = true,
     Theme = Theme,
     Flags = {},
@@ -1589,7 +1589,8 @@ function WindowMethods:SetOpen(state)
     end
 
     self.IsOpen = state
-    self.AnimationToken = (self.AnimationToken or 0) + 1
+    self.AnimationToken =
+        (self.AnimationToken or 0) + 1
 
     local token =
         self.AnimationToken
@@ -1634,12 +1635,6 @@ function WindowMethods:SetOpen(state)
     local openY =
         rest.Y
 
-    surface.Size =
-        UDim2.fromOffset(
-            fullSize.X,
-            fullSize.Y
-        )
-
     if fade
         and fade.Parent then
 
@@ -1652,14 +1647,21 @@ function WindowMethods:SetOpen(state)
         fade.GroupTransparency = 0
     end
 
+    surface.Size =
+        UDim2.fromOffset(
+            fullSize.X,
+            fullSize.Y
+        )
+
     if state then
-        -- Original menu opening motion, with no wipe line.
+        -- Open: simply unfold from height 0.
+        -- No wipe line, no final 1px edge.
         root.Visible = true
 
         root.Position =
             UDim2.fromOffset(
                 openX,
-                openY + fullSize.Y
+                openY
             )
 
         root.Size =
@@ -1671,97 +1673,53 @@ function WindowMethods:SetOpen(state)
         surface.Position =
             UDim2.fromOffset(
                 0,
-                -fullSize.Y
+                0
             )
 
-        local rootPosTween =
+        local openTween =
             tween(
                 root,
                 {
-                    Position =
+                    Size =
                         UDim2.fromOffset(
-                            openX,
-                            openY
+                            fullSize.X,
+                            fullSize.Y
                         )
                 },
-                0.40,
+                0.34,
                 Enum.EasingStyle.Quint,
                 Enum.EasingDirection.Out
             )
 
-        tween(
-            root,
-            {
-                Size =
-                    UDim2.fromOffset(
-                        fullSize.X,
-                        fullSize.Y
-                    )
-            },
-            0.40,
-            Enum.EasingStyle.Quint,
-            Enum.EasingDirection.Out
-        )
+        openTween.Completed:Wait()
 
-        tween(
-            surface,
-            {
-                Position =
-                    UDim2.fromOffset(
-                        0,
-                        0
-                    )
-            },
-            0.40,
-            Enum.EasingStyle.Quint,
-            Enum.EasingDirection.Out
-        )
+        if self.AnimationToken ~= token
+            or not self.IsOpen then
 
-        task.spawn(function()
-            rootPosTween.Completed:Wait()
+            return
+        end
 
-            if self.AnimationToken ~= token
-                or not self.IsOpen then
+        root.Position =
+            UDim2.fromOffset(
+                openX,
+                openY
+            )
 
-                return
-            end
+        root.Size =
+            UDim2.fromOffset(
+                fullSize.X,
+                fullSize.Y
+            )
 
-            if root
-                and root.Parent then
-
-                local finalRest =
-                    self.RestPosition
-                    or Vector2.new(
-                        openX,
-                        openY
-                    )
-
-                root.Position =
-                    UDim2.fromOffset(
-                        finalRest.X,
-                        finalRest.Y
-                    )
-
-                root.Size =
-                    UDim2.fromOffset(
-                        fullSize.X,
-                        fullSize.Y
-                    )
-            end
-
-            if surface
-                and surface.Parent then
-
-                surface.Position =
-                    UDim2.fromOffset(
-                        0,
-                        0
-                    )
-            end
-        end)
+        surface.Position =
+            UDim2.fromOffset(
+                0,
+                0
+            )
 
     else
-        -- Original menu closing motion, with no wipe line.
+        -- Close: simply collapse to height 0 and disappear.
+        -- Nothing remains visible at the end.
         root.Visible = true
 
         root.Position =
@@ -1786,87 +1744,51 @@ function WindowMethods:SetOpen(state)
             tween(
                 root,
                 {
-                    Position =
-                        UDim2.fromOffset(
-                            openX,
-                            openY + fullSize.Y
-                        ),
-
                     Size =
                         UDim2.fromOffset(
                             fullSize.X,
                             0
                         )
                 },
-                0.36,
+                0.30,
                 Enum.EasingStyle.Quint,
                 Enum.EasingDirection.InOut
             )
 
-        tween(
-            surface,
-            {
-                Position =
-                    UDim2.fromOffset(
-                        0,
-                        -fullSize.Y
-                    )
-            },
-            0.36,
-            Enum.EasingStyle.Quint,
-            Enum.EasingDirection.InOut
-        )
+        closeTween.Completed:Wait()
 
-        task.spawn(function()
-            closeTween.Completed:Wait()
+        if self.AnimationToken ~= token
+            or self.IsOpen then
 
-            if self.AnimationToken ~= token
-                or self.IsOpen then
+            return
+        end
 
-                return
-            end
+        root.Visible = false
 
-            if root
-                and root.Parent then
+        -- Reset while hidden so next opening starts clean.
+        root.Position =
+            UDim2.fromOffset(
+                openX,
+                openY
+            )
 
-                root.Visible = false
+        root.Size =
+            UDim2.fromOffset(
+                fullSize.X,
+                fullSize.Y
+            )
 
-                local finalRest =
-                    self.RestPosition
-                    or Vector2.new(
-                        openX,
-                        openY
-                    )
+        surface.Position =
+            UDim2.fromOffset(
+                0,
+                0
+            )
 
-                root.Position =
-                    UDim2.fromOffset(
-                        finalRest.X,
-                        finalRest.Y
-                    )
-
-                root.Size =
-                    UDim2.fromOffset(
-                        fullSize.X,
-                        fullSize.Y
-                    )
-            end
-
-            if surface
-                and surface.Parent then
-
-                surface.Position =
-                    UDim2.fromOffset(
-                        0,
-                        0
-                    )
-
-                surface.Size =
-                    UDim2.fromOffset(
-                        fullSize.X,
-                        fullSize.Y
-                    )
-            end
-        end)
+        surface.Size =
+            UDim2.fromOffset(
+                fullSize.X,
+                fullSize.Y
+            )
     end
 end
 
