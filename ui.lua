@@ -98,7 +98,7 @@ local Theme = {
 }
 
 local Library = {
-    Version = "UI-v3-inline-3",
+    Version = "UI-v3-inline-8-left-reveal-gradient-drag",
     SupportsInlineColorPicker = true,
     Theme = Theme,
     Flags = {},
@@ -544,11 +544,37 @@ local function makePreviewDraggable(handles, target, accentColor, onMoved)
 
         local previewStroke = Instance.new("UIStroke")
         previewStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-        previewStroke.Color = accentColor or Theme.Accent
+        previewStroke.Color = Color3.fromRGB(255, 255, 255)
         previewStroke.Thickness = 1
         previewStroke.Transparency = 0.02
         previewStroke.LineJoinMode = Enum.LineJoinMode.Round
         previewStroke.Parent = preview
+
+        local previewGradient = Instance.new("UIGradient")
+        previewGradient.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(
+                0,
+                Color3.fromRGB(0, 0, 0)
+            ),
+            ColorSequenceKeypoint.new(
+                0.25,
+                Color3.fromRGB(255, 255, 255)
+            ),
+            ColorSequenceKeypoint.new(
+                0.50,
+                Color3.fromRGB(0, 0, 0)
+            ),
+            ColorSequenceKeypoint.new(
+                0.75,
+                Color3.fromRGB(255, 255, 255)
+            ),
+            ColorSequenceKeypoint.new(
+                1,
+                Color3.fromRGB(0, 0, 0)
+            )
+        })
+        previewGradient.Rotation = 0
+        previewGradient.Parent = previewStroke
 
         preview.Position = target.Position
 
@@ -564,6 +590,14 @@ local function makePreviewDraggable(handles, target, accentColor, onMoved)
                 math.floor(smoothPreviewPosition.X + 0.5),
                 math.floor(smoothPreviewPosition.Y + 0.5)
             )
+
+            if previewGradient
+                and previewGradient.Parent then
+
+                previewGradient.Rotation =
+                    (previewGradient.Rotation
+                    + dt * 135) % 360
+            end
         end)
     end
 
@@ -1016,6 +1050,7 @@ function Library:Window(data)
         IsOpen = true,
         AccentObjects = {},
         CurrentPage = nil,
+        StartupPlayed = false,
     }, WindowMethods)
 
     local initialViewport = getViewportSize()
@@ -1298,6 +1333,267 @@ function Library:Window(data)
 
     windowRoot.Visible = true
     main.Visible = true
+
+    function window:PlayStartupAnimation()
+        if self.StartupPlayed then
+            return
+        end
+
+        self.StartupPlayed = true
+
+        local root =
+            self.Main
+
+        local surface =
+            self.Surface
+
+        local line =
+            self.AnimationLine
+
+        local outerStroke =
+            self.OuterStroke
+
+        if not root
+            or not root.Parent
+            or not surface
+            or not line
+            or not line.Parent then
+
+            return
+        end
+
+        local fullSize =
+            self.OpenPixelSize
+            or Vector2.new(
+                surface.AbsoluteSize.X,
+                surface.AbsoluteSize.Y
+            )
+
+        local rest =
+            self.RestPosition
+            or Vector2.new(
+                root.Position.X.Offset,
+                root.Position.Y.Offset
+            )
+
+        -- Hide the full window.
+        root.Visible = false
+
+        -- Same exact 1px line, starting from the LEFT edge.
+        line.Visible = true
+        line.AnchorPoint = Vector2.new(0, 0)
+
+        line.Position =
+            UDim2.fromOffset(
+                rest.X,
+                rest.Y
+            )
+
+        line.Size =
+            UDim2.fromOffset(
+                0,
+                1
+            )
+
+        line.BackgroundTransparency =
+            0.02
+
+        local lineTween =
+            tween(
+                line,
+                {
+                    Size =
+                        UDim2.fromOffset(
+                            fullSize.X,
+                            1
+                        )
+                },
+                0.30,
+                Enum.EasingStyle.Quint,
+                Enum.EasingDirection.Out
+            )
+
+        task.spawn(function()
+            lineTween.Completed:Wait()
+
+            if not root
+                or not root.Parent
+                or not line
+                or not line.Parent then
+
+                return
+            end
+
+            line.Visible = false
+
+            -- Start from the exact ORIGINAL open state.
+            root.Visible = true
+
+            root.Position =
+                UDim2.fromOffset(
+                    rest.X,
+                    rest.Y + fullSize.Y
+                )
+
+            root.Size =
+                UDim2.fromOffset(
+                    fullSize.X,
+                    0
+                )
+
+            surface.Size =
+                UDim2.fromOffset(
+                    fullSize.X,
+                    fullSize.Y
+                )
+
+            surface.Position =
+                UDim2.fromOffset(
+                    0,
+                    -fullSize.Y
+                )
+
+            surface.BorderSizePixel = 0
+
+            if outerStroke
+                and outerStroke.Parent then
+
+                outerStroke.Transparency = 1
+            end
+
+            -- The same 1px edge now follows the old opening boundary.
+            line.Visible = true
+
+            line.Position =
+                UDim2.fromOffset(
+                    rest.X,
+                    rest.Y + fullSize.Y
+                )
+
+            line.Size =
+                UDim2.fromOffset(
+                    fullSize.X,
+                    1
+                )
+
+            local rootPosTween =
+                tween(
+                    root,
+                    {
+                        Position =
+                            UDim2.fromOffset(
+                                rest.X,
+                                rest.Y
+                            )
+                    },
+                    0.40,
+                    Enum.EasingStyle.Quint,
+                    Enum.EasingDirection.Out
+                )
+
+            tween(
+                root,
+                {
+                    Size =
+                        UDim2.fromOffset(
+                            fullSize.X,
+                            fullSize.Y
+                        )
+                },
+                0.40,
+                Enum.EasingStyle.Quint,
+                Enum.EasingDirection.Out
+            )
+
+            tween(
+                surface,
+                {
+                    Position =
+                        UDim2.fromOffset(
+                            0,
+                            0
+                        )
+                },
+                0.40,
+                Enum.EasingStyle.Quint,
+                Enum.EasingDirection.Out
+            )
+
+            tween(
+                line,
+                {
+                    Position =
+                        UDim2.fromOffset(
+                            rest.X,
+                            rest.Y
+                        )
+                },
+                0.40,
+                Enum.EasingStyle.Quint,
+                Enum.EasingDirection.Out
+            )
+
+            rootPosTween.Completed:Wait()
+
+            if not root
+                or not root.Parent then
+
+                return
+            end
+
+            root.Position =
+                UDim2.fromOffset(
+                    rest.X,
+                    rest.Y
+                )
+
+            root.Size =
+                UDim2.fromOffset(
+                    fullSize.X,
+                    fullSize.Y
+                )
+
+            surface.Position =
+                UDim2.fromOffset(
+                    0,
+                    0
+                )
+
+            surface.Size =
+                UDim2.fromOffset(
+                    fullSize.X,
+                    fullSize.Y
+                )
+
+            surface.BorderSizePixel = 2
+
+            if outerStroke
+                and outerStroke.Parent then
+
+                outerStroke.Transparency = 0
+            end
+
+            if line
+                and line.Parent then
+
+                line.Visible = false
+                line.Size =
+                    UDim2.fromOffset(
+                        fullSize.X,
+                        1
+                    )
+            end
+        end)
+    end
+
+    task.defer(function()
+        if window
+            and window.Main
+            and window.Main.Parent then
+
+            window:PlayStartupAnimation()
+        end
+    end)
 
     return window
 end
