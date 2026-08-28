@@ -98,7 +98,7 @@ local Theme = {
 }
 
 local Library = {
-    Version = "UI-v3-inline-3",
+    Version = "UI-v3-inline-4-startup",
     SupportsInlineColorPicker = true,
     Theme = Theme,
     Flags = {},
@@ -1280,11 +1280,428 @@ function Library:Window(data)
     windowRoot.Visible = true
     main.Visible = true
 
+    function window:PlayStartupAnimation()
+        if self.StartupPlayed then
+            return
+        end
+
+        self.StartupPlayed = true
+        self.StartupAnimating = true
+
+        self.AnimationToken =
+            (self.AnimationToken or 0) + 1
+
+        local token =
+            self.AnimationToken
+
+        local root =
+            self.Main
+
+        local surface =
+            self.Surface
+
+        local edge =
+            self.WipeEdge
+
+        if not root
+            or not root.Parent
+            or not surface then
+
+            self.StartupAnimating = false
+            return
+        end
+
+        local fullSize =
+            self.OpenPixelSize
+            or Vector2.new(
+                root.AbsoluteSize.X,
+                root.AbsoluteSize.Y
+            )
+
+        local rest =
+            self.RestPosition
+            or Vector2.new(
+                root.Position.X.Offset,
+                root.Position.Y.Offset
+            )
+
+        local centerX =
+            rest.X + fullSize.X * 0.5
+
+        local centerY =
+            rest.Y + fullSize.Y * 0.5
+
+        -- Hide the real window for the first flash.
+        root.Visible = false
+
+        local line =
+            Instance.new("Frame")
+
+        line.Name =
+            "StartupLine"
+
+        line.Parent =
+            ScreenGui
+
+        line.AnchorPoint =
+            Vector2.new(0.5, 0.5)
+
+        line.Position =
+            UDim2.fromOffset(
+                centerX,
+                centerY
+            )
+
+        line.Size =
+            UDim2.fromOffset(
+                0,
+                2
+            )
+
+        line.BackgroundColor3 =
+            Theme.Accent
+
+        line.BackgroundTransparency =
+            0.08
+
+        line.BorderSizePixel = 0
+        line.ZIndex = 9999999
+
+        local lineCorner =
+            Instance.new("UICorner")
+
+        lineCorner.CornerRadius =
+            UDim.new(1, 0)
+
+        lineCorner.Parent =
+            line
+
+        local glow =
+            Instance.new("UIStroke")
+
+        glow.ApplyStrokeMode =
+            Enum.ApplyStrokeMode.Border
+
+        glow.Color =
+            Theme.Accent
+
+        glow.Thickness = 2
+        glow.Transparency = 0.28
+        glow.LineJoinMode =
+            Enum.LineJoinMode.Round
+
+        glow.Parent =
+            line
+
+        local lineGradient =
+            Instance.new("UIGradient")
+
+        lineGradient.Transparency =
+            NumberSequence.new({
+                NumberSequenceKeypoint.new(
+                    0,
+                    1
+                ),
+                NumberSequenceKeypoint.new(
+                    0.12,
+                    0.18
+                ),
+                NumberSequenceKeypoint.new(
+                    0.5,
+                    0
+                ),
+                NumberSequenceKeypoint.new(
+                    0.88,
+                    0.18
+                ),
+                NumberSequenceKeypoint.new(
+                    1,
+                    1
+                )
+            })
+
+        lineGradient.Parent =
+            line
+
+        local firstTween =
+            tween(
+                line,
+                {
+                    Size =
+                        UDim2.fromOffset(
+                            fullSize.X * 0.82,
+                            2
+                        )
+                },
+                0.24,
+                Enum.EasingStyle.Quint,
+                Enum.EasingDirection.Out
+            )
+
+        task.spawn(function()
+            firstTween.Completed:Wait()
+
+            if self.AnimationToken ~= token
+                or not root
+                or not root.Parent then
+
+                if line and line.Parent then
+                    line:Destroy()
+                end
+
+                self.StartupAnimating = false
+                return
+            end
+
+            -- Turn the flash into the window itself.
+            root.Visible = true
+
+            root.Position =
+                UDim2.fromOffset(
+                    rest.X,
+                    centerY - 1
+                )
+
+            root.Size =
+                UDim2.fromOffset(
+                    fullSize.X,
+                    2
+                )
+
+            surface.Size =
+                UDim2.fromOffset(
+                    fullSize.X,
+                    fullSize.Y
+                )
+
+            surface.Position =
+                UDim2.fromOffset(
+                    0,
+                    -fullSize.Y * 0.5
+                )
+
+            if edge then
+                edge.Visible = true
+                edge.Position =
+                    UDim2.fromOffset(
+                        0,
+                        0
+                    )
+            end
+
+            tween(
+                line,
+                {
+                    BackgroundTransparency = 1,
+                    Size =
+                        UDim2.fromOffset(
+                            fullSize.X,
+                            1
+                        )
+                },
+                0.10,
+                Enum.EasingStyle.Quad,
+                Enum.EasingDirection.Out
+            )
+
+            task.delay(0.10, function()
+                if line and line.Parent then
+                    line:Destroy()
+                end
+            end)
+
+            -- Main reveal: opens vertically from the center.
+            local revealTween =
+                tween(
+                    root,
+                    {
+                        Position =
+                            UDim2.fromOffset(
+                                rest.X - 4,
+                                rest.Y - 4
+                            ),
+
+                        Size =
+                            UDim2.fromOffset(
+                                fullSize.X + 8,
+                                fullSize.Y + 8
+                            )
+                    },
+                    0.46,
+                    Enum.EasingStyle.Quint,
+                    Enum.EasingDirection.Out
+                )
+
+            tween(
+                surface,
+                {
+                    Position =
+                        UDim2.fromOffset(
+                            4,
+                            4
+                        )
+                },
+                0.46,
+                Enum.EasingStyle.Quint,
+                Enum.EasingDirection.Out
+            )
+
+            revealTween.Completed:Wait()
+
+            if self.AnimationToken ~= token
+                or not root
+                or not root.Parent then
+
+                self.StartupAnimating = false
+                return
+            end
+
+            -- Tiny settle gives the "materializing" pop without
+            -- making the window look bouncy.
+            local settleTween =
+                tween(
+                    root,
+                    {
+                        Position =
+                            UDim2.fromOffset(
+                                rest.X,
+                                rest.Y
+                            ),
+
+                        Size =
+                            UDim2.fromOffset(
+                                fullSize.X,
+                                fullSize.Y
+                            )
+                    },
+                    0.14,
+                    Enum.EasingStyle.Quad,
+                    Enum.EasingDirection.Out
+                )
+
+            tween(
+                surface,
+                {
+                    Position =
+                        UDim2.fromOffset(
+                            0,
+                            0
+                        )
+                },
+                0.14,
+                Enum.EasingStyle.Quad,
+                Enum.EasingDirection.Out
+            )
+
+            settleTween.Completed:Wait()
+
+            if self.AnimationToken ~= token then
+                self.StartupAnimating = false
+                return
+            end
+
+            root.Position =
+                UDim2.fromOffset(
+                    rest.X,
+                    rest.Y
+                )
+
+            root.Size =
+                UDim2.fromOffset(
+                    fullSize.X,
+                    fullSize.Y
+                )
+
+            surface.Position =
+                UDim2.fromOffset(
+                    0,
+                    0
+                )
+
+            surface.Size =
+                UDim2.fromOffset(
+                    fullSize.X,
+                    fullSize.Y
+                )
+
+            if edge
+                and edge.Parent then
+
+                edge.Visible = false
+            end
+
+            self.StartupAnimating = false
+        end)
+    end
+
+    -- Defer one scheduler step so pages/sections can be built first.
+    task.defer(function()
+        if window
+            and window.Main
+            and window.Main.Parent then
+
+            window:PlayStartupAnimation()
+        end
+    end)
+
     return window
 end
 
 function WindowMethods:SetOpen(state)
     state = state == true
+
+    if self.StartupAnimating then
+        self.AnimationToken =
+            (self.AnimationToken or 0) + 1
+
+        self.StartupAnimating = false
+
+        if self.Main
+            and self.Main.Parent then
+
+            local fullSize =
+                self.OpenPixelSize
+                or Vector2.new(
+                    self.Main.AbsoluteSize.X,
+                    self.Main.AbsoluteSize.Y
+                )
+
+            local rest =
+                self.RestPosition
+                or Vector2.new(
+                    self.Main.Position.X.Offset,
+                    self.Main.Position.Y.Offset
+                )
+
+            self.Main.Visible = true
+
+            self.Main.Position =
+                UDim2.fromOffset(
+                    rest.X,
+                    rest.Y
+                )
+
+            self.Main.Size =
+                UDim2.fromOffset(
+                    fullSize.X,
+                    fullSize.Y
+                )
+
+            if self.Surface then
+                self.Surface.Position =
+                    UDim2.fromOffset(
+                        0,
+                        0
+                    )
+
+                self.Surface.Size =
+                    UDim2.fromOffset(
+                        fullSize.X,
+                        fullSize.Y
+                    )
+            end
+        end
+    end
 
     if self.IsOpen == state then
         return
