@@ -98,7 +98,7 @@ local Theme = {
 }
 
 local Library = {
-    Version = "UI-v3-inline-8-left-reveal-gradient-drag",
+    Version = "UI-v3-inline-9-fade-reveal-close",
     SupportsInlineColorPicker = true,
     Theme = Theme,
     Flags = {},
@@ -1070,8 +1070,19 @@ function Library:Window(data)
         ClipsDescendants = true,
     })
 
-    local main = create("Frame", {
+    local fadeGroup = create("CanvasGroup", {
         Parent = windowRoot,
+        Name = "WindowFade",
+        AnchorPoint = Vector2.new(0, 0),
+        Position = UDim2.fromOffset(0, 0),
+        Size = window.Size,
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        GroupTransparency = 0,
+    })
+
+    local main = create("Frame", {
+        Parent = fadeGroup,
         Name = "Window",
         AnchorPoint = Vector2.new(0, 0),
         Position = UDim2.fromOffset(0, 0),
@@ -1084,6 +1095,7 @@ function Library:Window(data)
 
     window.Main = windowRoot
     window.Surface = main
+    window.FadeGroup = fadeGroup
     window.OpenPixelSize = Vector2.new(initialWidth, initialHeight)
     window.RestPosition = Vector2.new(initialX, initialY)
     window.AnimationToken = 0
@@ -1202,6 +1214,11 @@ function Library:Window(data)
     main.Position = UDim2.fromOffset(0, 0)
     constrainWindow(windowRoot, 650, 440)
 
+    fadeGroup.Size = UDim2.fromOffset(
+        windowRoot.AbsoluteSize.X,
+        windowRoot.AbsoluteSize.Y
+    )
+
     main.Size = UDim2.fromOffset(
         windowRoot.AbsoluteSize.X,
         windowRoot.AbsoluteSize.Y
@@ -1299,6 +1316,16 @@ function Library:Window(data)
         main,
         function(size)
             window.OpenPixelSize = size
+
+            if fadeGroup
+                and fadeGroup.Parent then
+
+                fadeGroup.Size =
+                    UDim2.fromOffset(
+                        size.X,
+                        size.Y
+                    )
+            end
         end
     )
 
@@ -1350,6 +1377,9 @@ function Library:Window(data)
         local line =
             self.AnimationLine
 
+        local fade =
+            self.FadeGroup
+
         local outerStroke =
             self.OuterStroke
 
@@ -1378,6 +1408,12 @@ function Library:Window(data)
 
         -- Hide the full window.
         root.Visible = false
+
+        if fade
+            and fade.Parent then
+
+            fade.GroupTransparency = 1
+        end
 
         -- Same exact 1px line, starting from the LEFT edge.
         line.Visible = true
@@ -1519,6 +1555,22 @@ function Library:Window(data)
                 Enum.EasingDirection.Out
             )
 
+            if fade
+                and fade.Parent then
+
+                fade.GroupTransparency = 1
+
+                tween(
+                    fade,
+                    {
+                        GroupTransparency = 0
+                    },
+                    0.48,
+                    Enum.EasingStyle.Sine,
+                    Enum.EasingDirection.Out
+                )
+            end
+
             tween(
                 line,
                 {
@@ -1566,6 +1618,12 @@ function Library:Window(data)
                 )
 
             surface.BorderSizePixel = 2
+
+            if fade
+                and fade.Parent then
+
+                fade.GroupTransparency = 0
+            end
 
             if outerStroke
                 and outerStroke.Parent then
@@ -1617,6 +1675,7 @@ function WindowMethods:SetOpen(state)
     local surface = self.Surface
     local edge = self.WipeEdge
     local line = self.AnimationLine
+    local fade = self.FadeGroup
     local outerStroke = self.OuterStroke
 
     if not root or not root.Parent or not surface then
@@ -1685,6 +1744,18 @@ function WindowMethods:SetOpen(state)
         root.Size = UDim2.fromOffset(fullSize.X, 0)
         surface.Position = UDim2.fromOffset(0, -fullSize.Y)
 
+        if fade
+            and fade.Parent then
+
+            fade.Size =
+                UDim2.fromOffset(
+                    fullSize.X,
+                    fullSize.Y
+                )
+
+            fade.GroupTransparency = 1
+        end
+
         beginThinLine(openY + fullSize.Y)
 
         local rootPosTween = tween(
@@ -1710,6 +1781,20 @@ function WindowMethods:SetOpen(state)
             Enum.EasingStyle.Quint,
             Enum.EasingDirection.Out
         )
+
+        if fade
+            and fade.Parent then
+
+            tween(
+                fade,
+                {
+                    GroupTransparency = 0
+                },
+                0.44,
+                Enum.EasingStyle.Sine,
+                Enum.EasingDirection.Out
+            )
+        end
 
         if line and line.Parent then
             tween(
@@ -1738,6 +1823,12 @@ function WindowMethods:SetOpen(state)
                 surface.Position = UDim2.fromOffset(0, 0)
             end
 
+            if fade
+                and fade.Parent then
+
+                fade.GroupTransparency = 0
+            end
+
             finishThinLine()
         end)
 
@@ -1750,6 +1841,28 @@ function WindowMethods:SetOpen(state)
         surface.Position = UDim2.fromOffset(0, 0)
 
         beginThinLine(openY)
+
+        if fade
+            and fade.Parent then
+
+            fade.Size =
+                UDim2.fromOffset(
+                    fullSize.X,
+                    fullSize.Y
+                )
+
+            fade.GroupTransparency = 0
+
+            tween(
+                fade,
+                {
+                    GroupTransparency = 0.88
+                },
+                0.30,
+                Enum.EasingStyle.Sine,
+                Enum.EasingDirection.In
+            )
+        end
 
         local closeTween = tween(
             root,
@@ -1798,6 +1911,49 @@ function WindowMethods:SetOpen(state)
             if surface and surface.Parent then
                 surface.Position = UDim2.fromOffset(0, 0)
                 surface.Size = UDim2.fromOffset(fullSize.X, fullSize.Y)
+            end
+
+            -- Final close flourish:
+            -- keep the exact 1px line and erase it RIGHT -> LEFT.
+            if line
+                and line.Parent then
+
+                line.Visible = true
+                line.AnchorPoint = Vector2.new(0, 0)
+                line.Position =
+                    UDim2.fromOffset(
+                        openX,
+                        openY + fullSize.Y
+                    )
+
+                line.Size =
+                    UDim2.fromOffset(
+                        fullSize.X,
+                        1
+                    )
+
+                local lineCloseTween =
+                    tween(
+                        line,
+                        {
+                            Size =
+                                UDim2.fromOffset(
+                                    0,
+                                    1
+                                )
+                        },
+                        0.18,
+                        Enum.EasingStyle.Quint,
+                        Enum.EasingDirection.In
+                    )
+
+                lineCloseTween.Completed:Wait()
+            end
+
+            if fade
+                and fade.Parent then
+
+                fade.GroupTransparency = 0
             end
 
             finishThinLine()
