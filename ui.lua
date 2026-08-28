@@ -98,7 +98,7 @@ local Theme = {
 }
 
 local Library = {
-    Version = "UI-v3-inline-7-simple-thinline",
+    Version = "UI-v3-inline-3",
     SupportsInlineColorPicker = true,
     Theme = Theme,
     Flags = {},
@@ -1070,7 +1070,6 @@ function Library:Window(data)
 
     local outerStroke = stroke(main, Theme.Outline, 0, 1)
     outerStroke.LineJoinMode = Enum.LineJoinMode.Round
-    window.OuterStroke = outerStroke
 
     local side = create("Frame", {
         Parent = main,
@@ -1281,680 +1280,160 @@ function Library:Window(data)
     windowRoot.Visible = true
     main.Visible = true
 
-    function window:PlayStartupAnimation()
-        if self.StartupPlayed then
-            return
-        end
-
-        self.StartupPlayed = true
-        self.StartupAnimating = true
-
-        self.AnimationToken =
-            (self.AnimationToken or 0) + 1
-
-        local token =
-            self.AnimationToken
-
-        local root =
-            self.Main
-
-        local surface =
-            self.Surface
-
-        local edge =
-            self.WipeEdge
-
-        local outerStroke =
-            self.OuterStroke
-
-        if not root
-            or not root.Parent
-            or not surface then
-
-            self.StartupAnimating = false
-            return
-        end
-
-        local fullSize =
-            self.OpenPixelSize
-            or Vector2.new(
-                root.AbsoluteSize.X,
-                root.AbsoluteSize.Y
-            )
-
-        local rest =
-            self.RestPosition
-            or Vector2.new(
-                root.Position.X.Offset,
-                root.Position.Y.Offset
-            )
-
-        local centerX =
-            rest.X + fullSize.X * 0.5
-
-        -- Keep the real GUI hidden while the startup line appears.
-        root.Visible = false
-
-        local startupLine =
-            Instance.new("Frame")
-
-        startupLine.Name =
-            "StartupLine"
-
-        startupLine.Parent =
-            ScreenGui
-
-        startupLine.AnchorPoint =
-            Vector2.new(
-                0.5,
-                0
-            )
-
-        startupLine.Position =
-            UDim2.fromOffset(
-                centerX,
-                rest.Y
-            )
-
-        startupLine.Size =
-            UDim2.fromOffset(
-                0,
-                1
-            )
-
-        startupLine.BackgroundColor3 =
-            Theme.Accent
-
-        startupLine.BackgroundTransparency =
-            1
-
-        startupLine.BorderSizePixel = 0
-        startupLine.ZIndex = 9999999
-
-        self.StartupEffect =
-            startupLine
-
-        local startupGlow =
-            Instance.new("UIStroke")
-
-        startupGlow.ApplyStrokeMode =
-            Enum.ApplyStrokeMode.Border
-
-        startupGlow.Color =
-            Theme.Accent
-
-        startupGlow.Thickness = 1
-        startupGlow.Transparency = 1
-        startupGlow.LineJoinMode =
-            Enum.LineJoinMode.Round
-
-        startupGlow.Parent =
-            startupLine
-
-        task.spawn(function()
-            -- First: softly appear from transparency while widening.
-            local lineTween =
-                tween(
-                    startupLine,
-                    {
-                        Size =
-                            UDim2.fromOffset(
-                                fullSize.X,
-                                1
-                            ),
-
-                        BackgroundTransparency =
-                            0.03
-                    },
-                    0.34,
-                    Enum.EasingStyle.Quint,
-                    Enum.EasingDirection.Out
-                )
-
-            tween(
-                startupGlow,
-                {
-                    Transparency = 0.30
-                },
-                0.34,
-                Enum.EasingStyle.Sine,
-                Enum.EasingDirection.Out
-            )
-
-            lineTween.Completed:Wait()
-
-            if self.AnimationToken ~= token
-                or not root
-                or not root.Parent then
-
-                if startupLine
-                    and startupLine.Parent then
-
-                    startupLine:Destroy()
-                end
-
-                self.StartupEffect = nil
-                self.StartupAnimating = false
-                return
-            end
-
-            -- Prepare the actual window as a genuine 1px top line.
-            root.Visible = true
-
-            root.Position =
-                UDim2.fromOffset(
-                    rest.X,
-                    rest.Y
-                )
-
-            root.Size =
-                UDim2.fromOffset(
-                    fullSize.X,
-                    1
-                )
-
-            surface.Visible = true
-            surface.BorderSizePixel = 0
-
-            surface.Size =
-                UDim2.fromOffset(
-                    fullSize.X,
-                    fullSize.Y
-                )
-
-            -- The content starts below the clipping region and rises in.
-            surface.Position =
-                UDim2.fromOffset(
-                    0,
-                    fullSize.Y
-                )
-
-            if outerStroke
-                and outerStroke.Parent then
-
-                outerStroke.Transparency = 1
-            end
-
-            if edge then
-                edge.Visible = true
-                edge.Position =
-                    UDim2.fromOffset(
-                        0,
-                        0
-                    )
-
-                edge.Size =
-                    UDim2.new(
-                        1,
-                        0,
-                        0,
-                        1
-                    )
-
-                edge.BackgroundTransparency =
-                    0.03
-            end
-
-            -- Hand the startup line into the window's own 1px edge.
-            tween(
-                startupLine,
-                {
-                    BackgroundTransparency = 1
-                },
-                0.08,
-                Enum.EasingStyle.Quad,
-                Enum.EasingDirection.Out
-            )
-
-            task.delay(0.08, function()
-                if startupLine
-                    and startupLine.Parent then
-
-                    startupLine:Destroy()
-                end
-
-                if self.StartupEffect
-                    == startupLine then
-
-                    self.StartupEffect = nil
-                end
-            end)
-
-            -- Clean reveal from the thin top line downward.
-            local openTween =
-                tween(
-                    root,
-                    {
-                        Size =
-                            UDim2.fromOffset(
-                                fullSize.X,
-                                fullSize.Y
-                            )
-                    },
-                    0.40,
-                    Enum.EasingStyle.Quint,
-                    Enum.EasingDirection.Out
-                )
-
-            tween(
-                surface,
-                {
-                    Position =
-                        UDim2.fromOffset(
-                            0,
-                            0
-                        )
-                },
-                0.40,
-                Enum.EasingStyle.Quint,
-                Enum.EasingDirection.Out
-            )
-
-            openTween.Completed:Wait()
-
-            if self.AnimationToken ~= token
-                or not root
-                or not root.Parent then
-
-                self.StartupAnimating = false
-                return
-            end
-
-            root.Position =
-                UDim2.fromOffset(
-                    rest.X,
-                    rest.Y
-                )
-
-            root.Size =
-                UDim2.fromOffset(
-                    fullSize.X,
-                    fullSize.Y
-                )
-
-            surface.Position =
-                UDim2.fromOffset(
-                    0,
-                    0
-                )
-
-            surface.Size =
-                UDim2.fromOffset(
-                    fullSize.X,
-                    fullSize.Y
-                )
-
-            surface.BorderSizePixel = 2
-
-            if outerStroke
-                and outerStroke.Parent then
-
-                outerStroke.Transparency = 0
-            end
-
-            if edge
-                and edge.Parent then
-
-                edge.Visible = false
-                edge.BackgroundTransparency =
-                    0.18
-            end
-
-            self.StartupAnimating = false
-        end)
-    end
-
-    -- Defer one scheduler step so pages/sections can be built first.
-    task.defer(function()
-        if window
-            and window.Main
-            and window.Main.Parent then
-
-            window:PlayStartupAnimation()
-        end
-    end)
-
     return window
 end
 
 function WindowMethods:SetOpen(state)
     state = state == true
 
-    if self.StartupAnimating then
-        self.AnimationToken =
-            (self.AnimationToken or 0) + 1
-
-        self.StartupAnimating = false
-
-        if self.StartupEffect
-            and self.StartupEffect.Parent then
-
-            self.StartupEffect:Destroy()
-        end
-
-        self.StartupEffect = nil
-    end
-
     if self.IsOpen == state then
         return
     end
 
     self.IsOpen = state
-
-    self.AnimationToken =
-        (self.AnimationToken or 0) + 1
-
-    local token =
-        self.AnimationToken
+    self.AnimationToken = (self.AnimationToken or 0) + 1
+    local token = self.AnimationToken
 
     if not state then
         Library:CloseOpenFrames()
     end
 
-    local root =
-        self.Main
+    local root = self.Main
+    local surface = self.Surface
+    local edge = self.WipeEdge
 
-    local surface =
-        self.Surface
-
-    local edge =
-        self.WipeEdge
-
-    local outerStroke =
-        self.OuterStroke
-
-    if not root
-        or not root.Parent
-        or not surface then
-
+    if not root or not root.Parent or not surface then
         return
     end
 
-    local fullSize =
-        self.OpenPixelSize
-        or Vector2.new(
-            surface.AbsoluteSize.X,
-            surface.AbsoluteSize.Y
-        )
+    local fullSize = self.OpenPixelSize or Vector2.new(
+        surface.AbsoluteSize.X,
+        surface.AbsoluteSize.Y
+    )
 
-    local rest =
-        self.RestPosition
-        or Vector2.new(
-            root.Position.X.Offset,
-            root.Position.Y.Offset
-        )
+    local rest = self.RestPosition or Vector2.new(
+        root.Position.X.Offset,
+        root.Position.Y.Offset
+    )
+    local openX = rest.X
+    local openY = rest.Y
 
-    local function thinLineOnly()
-        surface.BorderSizePixel = 0
+    surface.Size = UDim2.fromOffset(fullSize.X, fullSize.Y)
 
-        if outerStroke
-            and outerStroke.Parent then
+    if state then
 
-            outerStroke.Transparency = 1
-        end
+        root.Visible = true
+        root.Position = UDim2.fromOffset(openX, openY + fullSize.Y)
+        root.Size = UDim2.fromOffset(fullSize.X, 0)
+        surface.Position = UDim2.fromOffset(0, -fullSize.Y)
 
         if edge then
             edge.Visible = true
-
-            edge.Position =
-                UDim2.fromOffset(
-                    0,
-                    0
-                )
-
-            edge.Size =
-                UDim2.new(
-                    1,
-                    0,
-                    0,
-                    1
-                )
-
-            edge.BackgroundTransparency =
-                0.03
-        end
-    end
-
-    local function finishOpen()
-        root.Position =
-            UDim2.fromOffset(
-                rest.X,
-                rest.Y
-            )
-
-        root.Size =
-            UDim2.fromOffset(
-                fullSize.X,
-                fullSize.Y
-            )
-
-        surface.Position =
-            UDim2.fromOffset(
-                0,
-                0
-            )
-
-        surface.Size =
-            UDim2.fromOffset(
-                fullSize.X,
-                fullSize.Y
-            )
-
-        surface.BorderSizePixel = 2
-
-        if outerStroke
-            and outerStroke.Parent then
-
-            outerStroke.Transparency = 0
+            edge.Position = UDim2.fromOffset(0, 0)
         end
 
-        if edge
-            and edge.Parent then
-
-            edge.Visible = false
-            edge.BackgroundTransparency =
-                0.18
-        end
-    end
-
-    if state then
-        -- Open from the same exact 1px top line.
-        root.Visible = true
-
-        root.Position =
-            UDim2.fromOffset(
-                rest.X,
-                rest.Y
-            )
-
-        root.Size =
-            UDim2.fromOffset(
-                fullSize.X,
-                1
-            )
-
-        surface.Visible = true
-
-        surface.Size =
-            UDim2.fromOffset(
-                fullSize.X,
-                fullSize.Y
-            )
-
-        surface.Position =
-            UDim2.fromOffset(
-                0,
-                fullSize.Y
-            )
-
-        thinLineOnly()
-
-        local openTween =
-            tween(
-                root,
-                {
-                    Size =
-                        UDim2.fromOffset(
-                            fullSize.X,
-                            fullSize.Y
-                        )
-                },
-                0.34,
-                Enum.EasingStyle.Quint,
-                Enum.EasingDirection.Out
-            )
-
-        tween(
-            surface,
-            {
-                Position =
-                    UDim2.fromOffset(
-                        0,
-                        0
-                    )
-            },
-            0.34,
+        local rootPosTween = tween(
+            root,
+            {Position = UDim2.fromOffset(openX, openY)},
+            0.40,
             Enum.EasingStyle.Quint,
             Enum.EasingDirection.Out
         )
 
-        openTween.Completed:Wait()
-
-        if self.AnimationToken ~= token
-            or not self.IsOpen then
-            return
-        end
-
-        finishOpen()
-
-    else
-        -- Collapse TOP -> DOWN: content slides downward while
-        -- the clipped window shrinks back into its thin top line.
-        root.Visible = true
-
-        root.Position =
-            UDim2.fromOffset(
-                rest.X,
-                rest.Y
-            )
-
-        root.Size =
-            UDim2.fromOffset(
-                fullSize.X,
-                fullSize.Y
-            )
-
-        surface.Visible = true
-
-        surface.Position =
-            UDim2.fromOffset(
-                0,
-                0
-            )
-
-        surface.Size =
-            UDim2.fromOffset(
-                fullSize.X,
-                fullSize.Y
-            )
-
-        thinLineOnly()
-
-        local closeTween =
-            tween(
-                root,
-                {
-                    Size =
-                        UDim2.fromOffset(
-                            fullSize.X,
-                            1
-                        )
-                },
-                0.30,
-                Enum.EasingStyle.Quint,
-                Enum.EasingDirection.InOut
-            )
+        tween(
+            root,
+            {Size = UDim2.fromOffset(fullSize.X, fullSize.Y)},
+            0.40,
+            Enum.EasingStyle.Quint,
+            Enum.EasingDirection.Out
+        )
 
         tween(
             surface,
+            {Position = UDim2.fromOffset(0, 0)},
+            0.40,
+            Enum.EasingStyle.Quint,
+            Enum.EasingDirection.Out
+        )
+
+        task.spawn(function()
+            rootPosTween.Completed:Wait()
+
+            if self.AnimationToken ~= token or not self.IsOpen then
+                return
+            end
+
+            if root and root.Parent then
+                local finalRest = self.RestPosition or Vector2.new(openX, openY)
+                root.Position = UDim2.fromOffset(finalRest.X, finalRest.Y)
+                root.Size = UDim2.fromOffset(fullSize.X, fullSize.Y)
+            end
+
+            if surface and surface.Parent then
+                surface.Position = UDim2.fromOffset(0, 0)
+            end
+
+            if edge and edge.Parent then
+                edge.Visible = false
+            end
+        end)
+    else
+
+        root.Visible = true
+        root.Position = UDim2.fromOffset(openX, openY)
+        root.Size = UDim2.fromOffset(fullSize.X, fullSize.Y)
+        surface.Position = UDim2.fromOffset(0, 0)
+
+        if edge then
+            edge.Visible = true
+            edge.Position = UDim2.fromOffset(0, 0)
+        end
+
+        local closeTween = tween(
+            root,
             {
-                Position =
-                    UDim2.fromOffset(
-                        0,
-                        fullSize.Y
-                    )
+                Position = UDim2.fromOffset(openX, openY + fullSize.Y),
+                Size = UDim2.fromOffset(fullSize.X, 0),
             },
-            0.30,
+            0.36,
             Enum.EasingStyle.Quint,
             Enum.EasingDirection.InOut
         )
 
-        closeTween.Completed:Wait()
+        tween(
+            surface,
+            {Position = UDim2.fromOffset(0, -fullSize.Y)},
+            0.36,
+            Enum.EasingStyle.Quint,
+            Enum.EasingDirection.InOut
+        )
 
-        if self.AnimationToken ~= token
-            or self.IsOpen then
-            return
-        end
+        task.spawn(function()
+            closeTween.Completed:Wait()
 
-        -- Leave the real 1px line for a short clean finish.
-        root.Size =
-            UDim2.fromOffset(
-                fullSize.X,
-                1
-            )
+            if self.AnimationToken ~= token or self.IsOpen then
+                return
+            end
 
-        task.wait(0.045)
+            if root and root.Parent then
+                root.Visible = false
 
-        if self.AnimationToken ~= token
-            or self.IsOpen then
-            return
-        end
+                local finalRest = self.RestPosition or Vector2.new(openX, openY)
+                root.Position = UDim2.fromOffset(finalRest.X, finalRest.Y)
+                root.Size = UDim2.fromOffset(fullSize.X, fullSize.Y)
+            end
 
-        root.Visible = false
+            if surface and surface.Parent then
+                surface.Position = UDim2.fromOffset(0, 0)
+                surface.Size = UDim2.fromOffset(fullSize.X, fullSize.Y)
+            end
 
-        -- Reset hidden state so the next open starts cleanly.
-        root.Position =
-            UDim2.fromOffset(
-                rest.X,
-                rest.Y
-            )
-
-        root.Size =
-            UDim2.fromOffset(
-                fullSize.X,
-                fullSize.Y
-            )
-
-        surface.Position =
-            UDim2.fromOffset(
-                0,
-                0
-            )
-
-        surface.Size =
-            UDim2.fromOffset(
-                fullSize.X,
-                fullSize.Y
-            )
-
-        surface.BorderSizePixel = 2
-
-        if outerStroke
-            and outerStroke.Parent then
-
-            outerStroke.Transparency = 0
-        end
-
-        if edge
-            and edge.Parent then
-
-            edge.Visible = false
-            edge.BackgroundTransparency =
-                0.18
-        end
+            if edge and edge.Parent then
+                edge.Visible = false
+            end
+        end)
     end
 end
-
 
 function WindowMethods:Page(data)
     data = data or {}
