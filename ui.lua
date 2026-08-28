@@ -1070,6 +1070,7 @@ function Library:Window(data)
 
     local outerStroke = stroke(main, Theme.Outline, 0, 1)
     outerStroke.LineJoinMode = Enum.LineJoinMode.Round
+    window.OuterStroke = outerStroke
 
     local side = create("Frame", {
         Parent = main,
@@ -1301,6 +1302,7 @@ function WindowMethods:SetOpen(state)
     local root = self.Main
     local surface = self.Surface
     local edge = self.WipeEdge
+    local outerStroke = self.OuterStroke
 
     if not root or not root.Parent or not surface then
         return
@@ -1327,9 +1329,18 @@ function WindowMethods:SetOpen(state)
         root.Size = UDim2.fromOffset(fullSize.X, 0)
         surface.Position = UDim2.fromOffset(0, -fullSize.Y)
 
+        -- Keep the original animation, but remove extra border pixels
+        -- so the visible wipe is always exactly 1px.
+        surface.BorderSizePixel = 0
+
+        if outerStroke and outerStroke.Parent then
+            outerStroke.Transparency = 1
+        end
+
         if edge then
             edge.Visible = true
             edge.Position = UDim2.fromOffset(0, 0)
+            edge.Size = UDim2.new(1, 0, 0, 1)
         end
 
         local rootPosTween = tween(
@@ -1371,6 +1382,11 @@ function WindowMethods:SetOpen(state)
 
             if surface and surface.Parent then
                 surface.Position = UDim2.fromOffset(0, 0)
+                surface.BorderSizePixel = 2
+            end
+
+            if outerStroke and outerStroke.Parent then
+                outerStroke.Transparency = 0
             end
 
             if edge and edge.Parent then
@@ -1384,9 +1400,18 @@ function WindowMethods:SetOpen(state)
         root.Size = UDim2.fromOffset(fullSize.X, fullSize.Y)
         surface.Position = UDim2.fromOffset(0, 0)
 
+        -- Do not change the original close animation itself.
+        -- Hide only the thick frame while it collapses.
+        surface.BorderSizePixel = 0
+
+        if outerStroke and outerStroke.Parent then
+            outerStroke.Transparency = 1
+        end
+
         if edge then
             edge.Visible = true
             edge.Position = UDim2.fromOffset(0, 0)
+            edge.Size = UDim2.new(1, 0, 0, 1)
         end
 
         local closeTween = tween(
@@ -1426,6 +1451,11 @@ function WindowMethods:SetOpen(state)
             if surface and surface.Parent then
                 surface.Position = UDim2.fromOffset(0, 0)
                 surface.Size = UDim2.fromOffset(fullSize.X, fullSize.Y)
+                surface.BorderSizePixel = 2
+            end
+
+            if outerStroke and outerStroke.Parent then
+                outerStroke.Transparency = 0
             end
 
             if edge and edge.Parent then
