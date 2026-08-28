@@ -98,7 +98,7 @@ local Theme = {
 }
 
 local Library = {
-    Version = "UI-v3-inline-12-collapse-no-line",
+    Version = "UI-v3-inline-13-collapse-down",
     SupportsInlineColorPicker = true,
     Theme = Theme,
     Flags = {},
@@ -1744,6 +1744,12 @@ function WindowMethods:SetOpen(state)
             tween(
                 root,
                 {
+                    Position =
+                        UDim2.fromOffset(
+                            openX,
+                            openY + fullSize.Y
+                        ),
+
                     Size =
                         UDim2.fromOffset(
                             fullSize.X,
