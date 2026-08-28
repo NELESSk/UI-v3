@@ -98,7 +98,7 @@ local Theme = {
 }
 
 local Library = {
-    Version = "UI-v3-inline-13-collapse-down",
+    Version = "UI-v3-inline-14-true-top-to-bottom",
     SupportsInlineColorPicker = true,
     Theme = Theme,
     Flags = {},
@@ -1658,10 +1658,11 @@ function WindowMethods:SetOpen(state)
         -- No wipe line, no final 1px edge.
         root.Visible = true
 
+        -- Start collapsed at the BOTTOM edge.
         root.Position =
             UDim2.fromOffset(
                 openX,
-                openY
+                openY + fullSize.Y
             )
 
         root.Size =
@@ -1670,16 +1671,23 @@ function WindowMethods:SetOpen(state)
                 0
             )
 
+        -- Keep the real window visually in place while the mask opens.
         surface.Position =
             UDim2.fromOffset(
                 0,
-                0
+                -fullSize.Y
             )
 
         local openTween =
             tween(
                 root,
                 {
+                    Position =
+                        UDim2.fromOffset(
+                            openX,
+                            openY
+                        ),
+
                     Size =
                         UDim2.fromOffset(
                             fullSize.X,
@@ -1690,6 +1698,20 @@ function WindowMethods:SetOpen(state)
                 Enum.EasingStyle.Quint,
                 Enum.EasingDirection.Out
             )
+
+        tween(
+            surface,
+            {
+                Position =
+                    UDim2.fromOffset(
+                        0,
+                        0
+                    )
+            },
+            0.34,
+            Enum.EasingStyle.Quint,
+            Enum.EasingDirection.Out
+        )
 
         openTween.Completed:Wait()
 
@@ -1760,6 +1782,22 @@ function WindowMethods:SetOpen(state)
                 Enum.EasingStyle.Quint,
                 Enum.EasingDirection.InOut
             )
+
+        -- This compensation is what makes it visually erase
+        -- from TOP -> BOTTOM instead of sliding the whole GUI.
+        tween(
+            surface,
+            {
+                Position =
+                    UDim2.fromOffset(
+                        0,
+                        -fullSize.Y
+                    )
+            },
+            0.30,
+            Enum.EasingStyle.Quint,
+            Enum.EasingDirection.InOut
+        )
 
         closeTween.Completed:Wait()
 
