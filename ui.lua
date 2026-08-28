@@ -98,6 +98,8 @@ local Theme = {
 }
 
 local Library = {
+    Version = "UI-v3-inline-3",
+    SupportsInlineColorPicker = true,
     Theme = Theme,
     Flags = {},
     Connections = {},
@@ -153,6 +155,14 @@ function Library:SetOpenFrameCloser(closer, popupObject, sourceObject, insideChe
 end
 
 local function keyName(key)
+    if key == Enum.UserInputType.MouseButton1 then
+        return "LMB"
+    elseif key == Enum.UserInputType.MouseButton2 then
+        return "RMB"
+    elseif key == Enum.UserInputType.MouseButton3 then
+        return "MMB"
+    end
+
     local raw = tostring(key or Enum.KeyCode.Unknown)
     raw = string.gsub(raw, "Enum.KeyCode.", "")
     raw = string.gsub(raw, "Enum.UserInputType.", "")
@@ -1814,7 +1824,14 @@ function SectionMethods:Toggle(data)
     })
     textStroke(label, 0.45)
 
-    local toggle = {Value = value, Flag = flag}
+    local toggle = {
+        Value = value,
+        Flag = flag,
+        Row = row,
+        Label = label,
+        Box = box,
+        Section = self
+    }
 
     function toggle:Set(newValue, silent)
         value = newValue == true
@@ -2425,6 +2442,7 @@ function SectionMethods:Keybind(data)
     local key = data.Default or Enum.KeyCode.RightShift
     local mode = data.Mode or "Toggle"
     local waiting = false
+    local waitingStartedAt = 0
     local active = mode == "Always On"
     local modePopup
 
@@ -2552,6 +2570,38 @@ function SectionMethods:Keybind(data)
         object.Active = active
         registerFlag(flag .. "_State", active)
         task.spawn(callback, active, key, mode)
+    end
+
+    local function inputMatchesKey(input, bind)
+        if typeof(bind) ~= "EnumItem" then
+            return false
+        end
+
+        if bind.EnumType == Enum.KeyCode then
+            return bind ~= Enum.KeyCode.Unknown
+                and input.KeyCode == bind
+        end
+
+        if bind.EnumType == Enum.UserInputType then
+            return bind ~= Enum.UserInputType.None
+                and input.UserInputType == bind
+        end
+
+        return false
+    end
+
+    local function getBindableInput(input)
+        if input.KeyCode ~= Enum.KeyCode.Unknown then
+            return input.KeyCode
+        end
+
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.MouseButton2
+        or input.UserInputType == Enum.UserInputType.MouseButton3 then
+            return input.UserInputType
+        end
+
+        return nil
     end
 
     local function closeModePopup()
@@ -2713,11 +2763,17 @@ function SectionMethods:Keybind(data)
     end
 
     connect(row.InputBegan, function(input)
+        if waiting then
+            return
+        end
+
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
             closeModePopup()
             waiting = true
+            waitingStartedAt = os.clock()
             refreshKeyMarquee("PRESS KEY")
             tween(keyText, {TextColor3 = Theme.Accent}, 0.1)
+
         elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
             waiting = false
             refreshKeyMarquee(keyName(key))
@@ -2728,25 +2784,29 @@ function SectionMethods:Keybind(data)
 
     connect(UserInputService.InputBegan, function(input, processed)
         if waiting then
+            -- Ignore only the exact LMB press that opened capture mode.
+            -- A later LMB press is a valid bind.
             if input.UserInputType == Enum.UserInputType.MouseButton1
-            or input.UserInputType == Enum.UserInputType.MouseButton2 then
+            and os.clock() - waitingStartedAt < 0.08 then
                 return
             end
 
-            waiting = false
-
             if input.KeyCode == Enum.KeyCode.Escape then
+                waiting = false
                 refreshKeyMarquee(keyName(key))
                 tween(keyText, {TextColor3 = Theme.Text}, 0.1)
                 return
             end
 
-            if input.KeyCode ~= Enum.KeyCode.Unknown then
-                object:Set(input.KeyCode)
+            local newKey = getBindableInput(input)
+
+            if newKey then
+                waiting = false
+                object:Set(newKey)
+                refreshKeyMarquee(keyName(key))
+                tween(keyText, {TextColor3 = Theme.Text}, 0.1)
             end
 
-            refreshKeyMarquee(keyName(key))
-            tween(keyText, {TextColor3 = Theme.Text}, 0.1)
             return
         end
 
@@ -2754,7 +2814,7 @@ function SectionMethods:Keybind(data)
             return
         end
 
-        if input.KeyCode ~= key then
+        if not inputMatchesKey(input, key) then
             return
         end
 
@@ -2772,7 +2832,8 @@ function SectionMethods:Keybind(data)
             return
         end
 
-        if input.KeyCode == key and mode == "Hold" then
+        if inputMatchesKey(input, key)
+        and mode == "Hold" then
             fireState(false)
         end
     end)
@@ -2840,7 +2901,14 @@ function SectionMethods:Colorpicker(data)
     })
     stroke(preview, Theme.Outline, 0, 1)
 
-    local object = {Value = value, Flag = flag}
+    local object = {
+        Value = value,
+        Flag = flag,
+        Row = row,
+        Preview = preview,
+        Label = label,
+        Section = self
+    }
 
     function object:Set(color, silent)
         if typeof(color) ~= "Color3" then
@@ -2885,76 +2953,14 @@ function SectionMethods:Colorpicker(data)
 
         local popupWidth = 186
         local popupHeight = 174
-
-        local popupParent =
-            self.Window
-            and self.Window.Surface
-            or ScreenGui
-
-        local parentAbs =
-            popupParent.AbsolutePosition
-
-        local parentSize =
-            popupParent.AbsoluteSize
-
-        local wantedAbsX =
-            preview.AbsolutePosition.X
-            + preview.AbsoluteSize.X
-            - popupWidth
-
-        local wantedAbsY =
-            preview.AbsolutePosition.Y
-            + preview.AbsoluteSize.Y
-            + 4
-
-        local minAbsX =
-            parentAbs.X + 8
-
-        local minAbsY =
-            parentAbs.Y + 8
-
-        local maxAbsX =
-            parentAbs.X
-            + parentSize.X
-            - popupWidth
-            - 8
-
-        local maxAbsY =
-            parentAbs.Y
-            + parentSize.Y
-            - popupHeight
-            - 8
-
-        local popupAbsX =
-            clamp(
-                wantedAbsX,
-                minAbsX,
-                math.max(
-                    minAbsX,
-                    maxAbsX
-                )
-            )
-
-        local popupAbsY =
-            clamp(
-                wantedAbsY,
-                minAbsY,
-                math.max(
-                    minAbsY,
-                    maxAbsY
-                )
-            )
-
-        local popupX =
-            popupAbsX
-            - parentAbs.X
-
-        local popupY =
-            popupAbsY
-            - parentAbs.Y
+        local viewport = getViewportSize()
+        local wantedX = preview.AbsolutePosition.X + preview.AbsoluteSize.X - popupWidth
+        local wantedY = preview.AbsolutePosition.Y + preview.AbsoluteSize.Y + 4
+        local popupX = clamp(wantedX, WINDOW_MARGIN, math.max(WINDOW_MARGIN, viewport.X - popupWidth - WINDOW_MARGIN))
+        local popupY = clamp(wantedY, WINDOW_MARGIN, math.max(WINDOW_MARGIN, viewport.Y - popupHeight - WINDOW_MARGIN))
 
         popup = create("Frame", {
-            Parent = popupParent,
+            Parent = ScreenGui,
             Name = "ColorPickerPopup",
             Position = UDim2.fromOffset(popupX, popupY),
             Size = UDim2.fromOffset(popupWidth, popupHeight),
@@ -2986,26 +2992,6 @@ function SectionMethods:Colorpicker(data)
                 return pickerMouseInside or pointInsideGui(popup, point)
             end
         )
-
-        if self.Window and self.Window.Main then
-            popupConnect(
-                self.Window.Main:GetPropertyChangedSignal("Visible"),
-                function()
-                    if not self.Window.Main.Visible then
-                        destroyPopup()
-                    end
-                end
-            )
-
-            popupConnect(
-                self.Window.Main.AncestryChanged,
-                function(_, parent)
-                    if not parent then
-                        destroyPopup()
-                    end
-                end
-            )
-        end
 
         local pickerDrag = create("TextButton", {
             Parent = popup,
@@ -3628,6 +3614,51 @@ function SectionMethods:AddToggle(id, data)
         return selfObject
     end
 
+    object.AddColorPicker = function(selfObject, colorId, colorData)
+        colorData = colorData or {}
+
+        local picker = selfObject.Section:Colorpicker({
+            Name = "",
+            Flag = tostring(colorId),
+            Default = colorData.Default or Color3.fromRGB(255, 255, 255),
+            Callback = colorData.Callback or function() end,
+        })
+
+        decorateLinoriaObject(picker)
+        registerLinoriaControl(Library.Options, colorId, picker)
+
+        local pickerRow = picker.Row
+        local preview = picker.Preview
+        local pickerLabel = picker.Label
+
+        if pickerRow and selfObject.Row then
+            pickerRow.Parent = selfObject.Row
+            pickerRow.AnchorPoint = Vector2.new(1, 0.5)
+            pickerRow.Position = UDim2.new(1, -1, 0.5, 0)
+            pickerRow.Size = UDim2.fromOffset(24, 14)
+            pickerRow.BackgroundTransparency = 1
+            pickerRow.ZIndex = 50
+
+            if pickerLabel then
+                pickerLabel.Visible = false
+                pickerLabel.Text = ""
+            end
+
+            if preview then
+                preview.AnchorPoint = Vector2.new(0.5, 0.5)
+                preview.Position = UDim2.fromScale(0.5, 0.5)
+                preview.Size = UDim2.fromOffset(22, 12)
+                preview.ZIndex = 51
+            end
+
+            if selfObject.Label then
+                selfObject.Label.Size = UDim2.new(1, -52, 1, 0)
+            end
+        end
+
+        return picker
+    end
+
     return registerLinoriaControl(Library.Toggles, id, object)
 end
 
@@ -3816,6 +3847,18 @@ local KeyAliases = {
     MB1 = Enum.UserInputType.MouseButton1,
     MB2 = Enum.UserInputType.MouseButton2,
     MB3 = Enum.UserInputType.MouseButton3,
+
+    LMB = Enum.UserInputType.MouseButton1,
+    RMB = Enum.UserInputType.MouseButton2,
+    MMB = Enum.UserInputType.MouseButton3,
+
+    MOUSE1 = Enum.UserInputType.MouseButton1,
+    MOUSE2 = Enum.UserInputType.MouseButton2,
+    MOUSE3 = Enum.UserInputType.MouseButton3,
+
+    MOUSEBUTTON1 = Enum.UserInputType.MouseButton1,
+    MOUSEBUTTON2 = Enum.UserInputType.MouseButton2,
+    MOUSEBUTTON3 = Enum.UserInputType.MouseButton3,
 }
 
 local function resolveLinoriaKey(value)
